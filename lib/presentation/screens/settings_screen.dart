@@ -226,29 +226,37 @@ class _SettingsScreenState extends State<SettingsScreen>
                         _buildSettingsCard(
                           colorScheme: colorScheme,
                           children: [
-                            _buildSliderTile(
-                              icon: Icons.format_size,
-                              title: 'Arabic Text Size',
-                              subtitle:
-                                  '${prefProvider.arabicFontSize.round()}px',
-                              value: prefProvider.arabicFontSize,
-                              min: 14.0,
-                              max: 32.0,
-                              divisions: 18,
-                              onChanged: (value) =>
-                                  prefProvider.setArabicFontSize(value),
-                              colorScheme: colorScheme,
-                              color: colorScheme.primary,
+                            Consumer<EnhancedThemeProvider>(
+                              builder: (context, themeProvider, child) {
+                                return _buildSliderTile(
+                                  icon: Icons.format_size,
+                                  title: 'Arabic Text Size',
+                                  subtitle:
+                                      '${themeProvider.arabicFontSize.round()}px',
+                                  value: themeProvider.arabicFontSize,
+                                  min: 14.0,
+                                  max: 32.0,
+                                  divisions: 18,
+                                  onChanged: (value) =>
+                                      themeProvider.setArabicFontSize(value),
+                                  colorScheme: colorScheme,
+                                  color: colorScheme.primary,
+                                );
+                              },
                             ),
-                            _buildSwitchTile(
-                              icon: Icons.nightlight_round,
-                              title: 'Night Reading Mode',
-                              subtitle: 'Dim screen for comfortable reading',
-                              value: prefProvider.isNightReadingMode,
-                              onChanged: (value) =>
-                                  prefProvider.enableNightReadingMode(value),
-                              colorScheme: colorScheme,
-                              color: colorScheme.secondary,
+                            Consumer<EnhancedThemeProvider>(
+                              builder: (context, themeProvider, child) {
+                                return _buildSwitchTile(
+                                  icon: Icons.nightlight_round,
+                                  title: 'Night Reading Mode',
+                                  subtitle: 'Dim screen for comfortable reading',
+                                  value: themeProvider.isNightReadingMode,
+                                  onChanged: (value) =>
+                                      themeProvider.enableNightReadingMode(value),
+                                  colorScheme: colorScheme,
+                                  color: colorScheme.secondary,
+                                );
+                              },
                             ),
                             _buildSwitchTile(
                               icon: Icons.translate,

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/reading_progress_provider.dart';
-import '../providers/preference_settings_provider.dart';
+import '../providers/enhanced_theme_provider.dart';
 import '../screens/surah_reader.dart';
 
 class RecentReadingWidget extends StatelessWidget {
@@ -10,9 +10,9 @@ class RecentReadingWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final progressProvider = Provider.of<ReadingProgressProvider>(context);
-    final prefProvider = Provider.of<PreferenceSettingsProvider>(context);
+    final themeProvider = Provider.of<EnhancedThemeProvider>(context);
     final recentlyRead = progressProvider.getRecentlyRead();
-    final isDarkTheme = prefProvider.isDarkTheme;
+    final isDarkTheme = themeProvider.isDarkTheme(context);
 
     if (recentlyRead.isEmpty) {
       return const SizedBox.shrink();

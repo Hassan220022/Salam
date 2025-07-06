@@ -4,6 +4,7 @@ import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 
 import '../../domain/entities/surah_entity.dart';
 import '../providers/preference_settings_provider.dart';
+import '../providers/enhanced_theme_provider.dart';
 import '../providers/surah_provider.dart';
 import '../screens/surah_reader.dart';
 import '../widgets/recent_reading_widget.dart';
@@ -135,15 +136,14 @@ class _SurahListScreenState extends State<SurahListScreen>
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      body: Consumer2<SurahProvider, PreferenceSettingsProvider>(
-        builder: (context, surahProvider, preferenceProvider, child) {
+      body: Consumer3<SurahProvider, PreferenceSettingsProvider, EnhancedThemeProvider>(
+        builder: (context, surahProvider, preferenceProvider, themeProvider, child) {
           if (surahProvider.isLoading) {
             return _buildLoadingState();
           }
 
           if (surahProvider.errorMessage != null) {
-            return _buildErrorState(
-                surahProvider, preferenceProvider.isDarkTheme);
+            return _buildErrorState(surahProvider, themeProvider.isDarkTheme(context));
           }
 
           return CustomScrollView(

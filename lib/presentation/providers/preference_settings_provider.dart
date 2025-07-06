@@ -2,9 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class PreferenceSettingsProvider with ChangeNotifier {
-  bool _isDarkTheme = false;
-  bool _isNightReadingMode = false;
-  double _arabicFontSize = 20.0;
   String _selectedTranslation = 'en.sahih';
   String _selectedTafsir = 'en.jalalayn';
   bool _showTranslation = true;
@@ -12,9 +9,6 @@ class PreferenceSettingsProvider with ChangeNotifier {
   double _screenBrightness = 1.0;
 
   // Getters
-  bool get isDarkTheme => _isDarkTheme;
-  bool get isNightReadingMode => _isNightReadingMode;
-  double get arabicFontSize => _arabicFontSize;
   String get selectedTranslation => _selectedTranslation;
   String get selectedTafsir => _selectedTafsir;
   bool get showTranslation => _showTranslation;
@@ -23,24 +17,6 @@ class PreferenceSettingsProvider with ChangeNotifier {
 
   PreferenceSettingsProvider() {
     _loadPreferences();
-  }
-
-  void enableDarkTheme(bool isEnabled) {
-    _isDarkTheme = isEnabled;
-    _savePreferences();
-    notifyListeners();
-  }
-
-  void enableNightReadingMode(bool isEnabled) {
-    _isNightReadingMode = isEnabled;
-    _savePreferences();
-    notifyListeners();
-  }
-
-  void setArabicFontSize(double size) {
-    _arabicFontSize = size;
-    _savePreferences();
-    notifyListeners();
   }
 
   void setSelectedTranslation(String translation) {
@@ -75,9 +51,6 @@ class PreferenceSettingsProvider with ChangeNotifier {
 
   Future<void> _loadPreferences() async {
     final prefs = await SharedPreferences.getInstance();
-    _isDarkTheme = prefs.getBool('isDarkTheme') ?? false;
-    _isNightReadingMode = prefs.getBool('isNightReadingMode') ?? false;
-    _arabicFontSize = prefs.getDouble('arabicFontSize') ?? 20.0;
     _selectedTranslation = prefs.getString('selectedTranslation') ?? 'en.sahih';
     _selectedTafsir = prefs.getString('selectedTafsir') ?? 'en.jalalayn';
     _showTranslation = prefs.getBool('showTranslation') ?? true;
@@ -88,9 +61,6 @@ class PreferenceSettingsProvider with ChangeNotifier {
 
   Future<void> _savePreferences() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('isDarkTheme', _isDarkTheme);
-    await prefs.setBool('isNightReadingMode', _isNightReadingMode);
-    await prefs.setDouble('arabicFontSize', _arabicFontSize);
     await prefs.setString('selectedTranslation', _selectedTranslation);
     await prefs.setString('selectedTafsir', _selectedTafsir);
     await prefs.setBool('showTranslation', _showTranslation);

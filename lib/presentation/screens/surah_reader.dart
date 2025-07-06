@@ -7,6 +7,7 @@ import '../providers/preference_settings_provider.dart';
 import '../providers/bookmarks_provider.dart';
 import '../providers/reading_progress_provider.dart';
 import '../providers/surah_provider.dart';
+import '../providers/enhanced_theme_provider.dart';
 
 import '../../data/models/translation.dart';
 import '../../data/models/tafsir.dart';
@@ -805,40 +806,81 @@ class _SurahReaderScreenState extends State<SurahReaderScreen> {
               child: Column(
                 children: [
                   // Font Size Control
-                  _buildSettingsCard(
-                    icon: Icons.format_size,
-                    title: 'Font Size',
-                    subtitle: '${prefProvider.arabicFontSize.round()}px',
-                    child: Slider(
-                      value: prefProvider.arabicFontSize,
-                      min: 14.0,
-                      max: 32.0,
-                      divisions: 18,
-                      onChanged: (value) {
-                        prefProvider.setArabicFontSize(value);
-                      },
-                    ),
+                  Consumer<EnhancedThemeProvider>(
+                    builder: (context, themeProvider, child) {
+                      return _buildSettingsCard(
+                        icon: Icons.format_size,
+                        title: 'Font Size',
+                        subtitle: '${themeProvider.arabicFontSize.round()}px',
+                        child: Slider(
+                          value: themeProvider.arabicFontSize,
+                          min: 14.0,
+                          max: 32.0,
+                          divisions: 18,
+                          onChanged: (value) {
+                            themeProvider.setArabicFontSize(value);
+                          },
+                        ),
+                      );
+                    },
                   ),
 
                   const SizedBox(height: 16),
 
-                  // Night Reading Mode
+                  // Reading Mode Selection
                   _buildSettingsCard(
                     icon: Icons.nightlight_round,
-                    title: 'Night Reading Mode',
-                    subtitle: 'Dimmed screen for comfortable reading',
-                    child: SwitchListTile(
-                      value: prefProvider.isNightReadingMode,
-                      onChanged: (value) {
-                        prefProvider.enableNightReadingMode(value);
-                        if (value && _originalBrightness != null) {
-                          ScreenBrightness().setScreenBrightness(0.3);
-                        } else if (_originalBrightness != null) {
-                          ScreenBrightness()
-                              .setScreenBrightness(_originalBrightness!);
-                        }
+                    title: 'Reading Mode',
+                    subtitle: 'Choose your preferred reading experience',
+                    child: Consumer<EnhancedThemeProvider>(
+                      builder: (context, themeProvider, child) {
+                        return Column(
+                          children: [
+                            RadioListTile<ReadingMode>(
+                              title: const Text('Normal'),
+                              subtitle: const Text('Regular reading mode'),
+                              value: ReadingMode.normal,
+                              groupValue: themeProvider.readingMode,
+                              onChanged: (value) {
+                                if (value != null) {
+                                  themeProvider.setReadingMode(value);
+                                  if (_originalBrightness != null) {
+                                    ScreenBrightness().setScreenBrightness(_originalBrightness!);
+                                  }
+                                }
+                              },
+                            ),
+                            RadioListTile<ReadingMode>(
+                              title: const Text('Night Reading'),
+                              subtitle: const Text('Dark theme with dimmed screen'),
+                              value: ReadingMode.night,
+                              groupValue: themeProvider.readingMode,
+                              onChanged: (value) {
+                                if (value != null) {
+                                  themeProvider.setReadingMode(value);
+                                  if (_originalBrightness != null) {
+                                    ScreenBrightness().setScreenBrightness(0.3);
+                                  }
+                                }
+                              },
+                            ),
+                            RadioListTile<ReadingMode>(
+                              title: const Text('Comfort Reading'),
+                              subtitle: const Text('Warm colors for extended reading'),
+                              value: ReadingMode.comfort,
+                              groupValue: themeProvider.readingMode,
+                              onChanged: (value) {
+                                if (value != null) {
+                                  themeProvider.setReadingMode(value);
+                                  if (_originalBrightness != null) {
+                                    ScreenBrightness().setScreenBrightness(_originalBrightness!);
+                                  }
+                                }
+                              },
+                            ),
+                          ],
+                        );
                       },
-                      title: const Text('Enable'),
                     ),
                   ),
 
@@ -1115,15 +1157,20 @@ class _SurahReaderScreenState extends State<SurahReaderScreen> {
             padding: const EdgeInsets.all(24.0),
             child: Column(
               children: [
-                Text(
-                  verse.arabicText,
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontFamily: 'Roboto', // This should be a specific quran font if available
-                    fontSize: prefProvider.arabicFontSize,
-                    height: 2.0,
-                  ),
-                  textDirection: TextDirection.rtl,
-                  textAlign: TextAlign.center,
+                Consumer<EnhancedThemeProvider>(
+                  builder: (context, themeProvider, child) {
+                    return Text(
+                      verse.arabicText,
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontFamily: 'Roboto', // This should be a specific quran font if available
+                        fontSize: themeProvider.arabicFontSize,
+                        height: 2.0,
+                        color: themeProvider.getReadingModeTextColor(context),
+                      ),
+                      textDirection: TextDirection.rtl,
+                      textAlign: TextAlign.center,
+                    );
+                  },
                 ),
 
                 // Decorative ornament
@@ -1299,23 +1346,22 @@ class _SurahReaderScreenState extends State<SurahReaderScreen> {
   Widget build(BuildContext context) {
     final prefProvider = Provider.of<PreferenceSettingsProvider>(context);
     final progressProvider = Provider.of<ReadingProgressProvider>(context);
-    final isDarkTheme = prefProvider.isDarkTheme;
+    final themeProvider = Provider.of<EnhancedThemeProvider>(context);
     final progress = progressProvider.getProgress(widget.surahNumber);
+    final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: prefProvider.isNightReadingMode
-          ? Colors.black
-          : (isDarkTheme ? const Color(0xFF091945) : Colors.white),
+      backgroundColor: themeProvider.getReadingModeBackgroundColor(context),
       appBar: AppBar(
         title: Text(
           widget.surahName,
           style: TextStyle(
-            color: isDarkTheme ? Colors.white : const Color(0xff682DBD),
+            color: themeProvider.getReadingModeTextColor(context),
           ),
         ),
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        backgroundColor: themeProvider.getReadingModeBackgroundColor(context),
         iconTheme: IconThemeData(
-          color: isDarkTheme ? Colors.white : const Color(0xff682DBD),
+          color: themeProvider.getReadingModeTextColor(context),
         ),
         actions: [
           // Settings Button
@@ -1332,11 +1378,12 @@ class _SurahReaderScreenState extends State<SurahReaderScreen> {
           // Theme Toggle
           IconButton(
             icon: Icon(
-              isDarkTheme ? Icons.light_mode : Icons.dark_mode,
-              color: isDarkTheme ? Colors.white : const Color(0xff682DBD),
+              themeProvider.isDarkTheme(context) ? Icons.light_mode : Icons.dark_mode,
             ),
             onPressed: () {
-              prefProvider.enableDarkTheme(!isDarkTheme);
+              themeProvider.setThemeMode(
+                themeProvider.isDarkTheme(context) ? ThemeMode.light : ThemeMode.dark,
+              );
             },
           ),
         ],
@@ -1348,7 +1395,7 @@ class _SurahReaderScreenState extends State<SurahReaderScreen> {
                   child: Text(
                     'Failed to load ayahs. Please try again later.',
                     style: TextStyle(
-                      color: isDarkTheme ? Colors.white : Colors.black,
+                      color: themeProvider.getReadingModeTextColor(context),
                       fontSize: 16.0,
                     ),
                   ),
@@ -1357,125 +1404,97 @@ class _SurahReaderScreenState extends State<SurahReaderScreen> {
                   children: [
                     // Reading Progress Indicator
                     if (progress != null)
-                      Container(
-                        margin: const EdgeInsets.all(16.0),
-                        padding: const EdgeInsets.all(20.0),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: isDarkTheme
-                                ? [
-                                    const Color(0xFF2a2a3e),
-                                    const Color(0xFF1e1e2e)
-                                  ]
-                                : [
-                                    const Color(0xFFE8F4FD),
-                                    const Color(0xFFD1E9F6)
-                                  ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(20),
-                          boxShadow: [
-                            BoxShadow(
-                              color: isDarkTheme
-                                  ? Colors.black.withValues(alpha: 0.4)
-                                  : Colors.grey.withValues(alpha: 0.1),
-                              blurRadius: 10,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: [
-                                    const Color(0xFF2196F3),
-                                    const Color(0xFF1976D2)
-                                  ],
-                                ),
-                                borderRadius: BorderRadius.circular(15),
-                              ),
-                              child: const Icon(
-                                Icons.bookmark,
-                                color: Colors.white,
-                                size: 20,
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Continue Reading',
-                                    style: TextStyle(
-                                      color: isDarkTheme
-                                          ? Colors.white
-                                          : const Color(0xFF1976D2),
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'Last read: Ayah ${progress.lastReadAyah}',
-                                    style: TextStyle(
-                                      color: isDarkTheme
-                                          ? Colors.white70
-                                          : const Color(0xFF424242),
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Column(
-                              children: [
-                                Text(
-                                  '${progress.progressPercentage.toStringAsFixed(1)}%',
-                                  style: TextStyle(
-                                    color: isDarkTheme
-                                        ? Colors.white
-                                        : const Color(0xFF1976D2),
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 18,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Container(
-                                  width: 60,
-                                  height: 4,
-                                  decoration: BoxDecoration(
-                                    color: isDarkTheme
-                                        ? Colors.grey[700]
-                                        : Colors.grey[300],
-                                    borderRadius: BorderRadius.circular(2),
-                                  ),
-                                  child: FractionallySizedBox(
-                                    alignment: Alignment.centerLeft,
-                                    widthFactor:
-                                        progress.progressPercentage / 100,
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          colors: [
-                                            const Color(0xFF2196F3),
-                                            const Color(0xFF1976D2)
-                                          ],
-                                        ),
-                                        borderRadius: BorderRadius.circular(2),
-                                      ),
-                                    ),
-                                  ),
+                      Consumer<EnhancedThemeProvider>(
+                        builder: (context, themeProvider, child) {
+                          final isDarkTheme = themeProvider.isDarkTheme(context);
+                          return Container(
+                            margin: const EdgeInsets.all(16.0),
+                            padding: const EdgeInsets.all(20.0),
+                            decoration: BoxDecoration(
+                              color: themeProvider.getReadingModeCardColor(context),
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: theme.shadowColor.withOpacity(0.1),
+                                  blurRadius: 10,
+                                  offset: const Offset(0, 4),
                                 ),
                               ],
                             ),
-                          ],
-                        ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: theme.colorScheme.primary,
+                                    borderRadius: BorderRadius.circular(15),
+                                  ),
+                                  child: Icon(
+                                    Icons.bookmark,
+                                    color: theme.colorScheme.onPrimary,
+                                    size: 20,
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Continue Reading',
+                                        style: TextStyle(
+                                          color: themeProvider.getReadingModeTextColor(context),
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Last read: Ayah ${progress.lastReadAyah}',
+                                        style: TextStyle(
+                                          color: themeProvider.getReadingModeTextColor(context).withOpacity(0.7),
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Column(
+                                  children: [
+                                    Text(
+                                      '${progress.progressPercentage.toStringAsFixed(1)}%',
+                                      style: TextStyle(
+                                        color: theme.colorScheme.primary,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 18,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Container(
+                                      width: 60,
+                                      height: 4,
+                                      decoration: BoxDecoration(
+                                        color: theme.colorScheme.outline.withOpacity(0.3),
+                                        borderRadius: BorderRadius.circular(2),
+                                      ),
+                                      child: FractionallySizedBox(
+                                        alignment: Alignment.centerLeft,
+                                        widthFactor: progress.progressPercentage / 100,
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            color: theme.colorScheme.primary,
+                                            borderRadius: BorderRadius.circular(2),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          );
+                        },
                       ),
 
                     // Content
@@ -1485,40 +1504,47 @@ class _SurahReaderScreenState extends State<SurahReaderScreen> {
                         itemCount: _ayahs.length + 1, // +1 for Basmallah
                         itemBuilder: (context, index) {
                           if (index == 0) {
-                            return Padding(
-                              padding: const EdgeInsets.all(16.0),
-                              child: ColorFiltered(
-                                colorFilter: isDarkTheme
-                                    ? const ColorFilter.mode(
-                                        Colors.transparent, BlendMode.multiply)
-                                    : const ColorFilter.matrix([
-                                        -1,
-                                        0,
-                                        0,
-                                        0,
-                                        255,
-                                        0,
-                                        -1,
-                                        0,
-                                        0,
-                                        255,
-                                        0,
-                                        0,
-                                        -1,
-                                        0,
-                                        255,
-                                        0,
-                                        0,
-                                        0,
-                                        1,
-                                        0,
-                                      ]),
-                                child: Image.asset(
-                                  basmallahImagePath,
-                                  height: 50.0,
-                                  fit: BoxFit.contain,
-                                ),
-                              ),
+                            return Consumer<EnhancedThemeProvider>(
+                              builder: (context, themeProvider, child) {
+                                final isDarkTheme = themeProvider.isDarkTheme(context);
+                                return Padding(
+                                  padding: const EdgeInsets.all(16.0),
+                                  child: ColorFiltered(
+                                    colorFilter: isDarkTheme
+                                        ? const ColorFilter.mode(
+                                            Colors.transparent, BlendMode.multiply)
+                                        : const ColorFilter.matrix([
+                                            -1,
+                                            0,
+                                            0,
+                                            0,
+                                            255,
+                                            0,
+                                            -1,
+                                            0,
+                                            0,
+                                            255,
+                                            0,
+                                            0,
+                                            -1,
+                                            0,
+                                            255,
+                                            0,
+                                            0,
+                                            0,
+                                            1,
+                                            0,
+                                          ]),
+                                    child: Image.asset(
+                                      basmallahImagePath,
+                                      height: 50.0,
+                                      fit: BoxFit.contain,
+                                      color: themeProvider.getReadingModeTextColor(context),
+                                      colorBlendMode: BlendMode.modulate,
+                                    ),
+                                  ),
+                                );
+                              },
                             );
                           }
 
