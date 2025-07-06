@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'dart:math' as math;
+import 'package:flutter_compass/flutter_compass.dart';
+import 'package:sensors_plus/sensors_plus.dart';
 import '../widgets/enhanced_loading.dart';
 import '../../core/utils/app_theme.dart';
 
@@ -92,8 +95,12 @@ class _PrayerTimesWidgetState extends State<PrayerTimesWidget>
   Duration? _timeLeft;
   String? _errorMessage;
   double? _qiblaDirection;
+  double? _deviceHeading;
+  double? _compassAccuracy;
+  bool _isCompassAligned = false;
   late AnimationController _animationController;
   late AnimationController _qiblaController;
+  late AnimationController _pulseController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _qiblaAnimation;
 
@@ -108,6 +115,10 @@ class _PrayerTimesWidgetState extends State<PrayerTimesWidget>
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
+    _pulseController = AnimationController(
+      duration: const Duration(seconds: 2),
+      vsync: this,
+    )..repeat();
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
@@ -121,6 +132,7 @@ class _PrayerTimesWidgetState extends State<PrayerTimesWidget>
   void dispose() {
     _animationController.dispose();
     _qiblaController.dispose();
+    _pulseController.dispose();
     super.dispose();
   }
 
@@ -232,6 +244,7 @@ class _PrayerTimesWidgetState extends State<PrayerTimesWidget>
         });
         _animationController.forward();
         _qiblaController.forward();
+        _startCompassListening();
       }
     } catch (e) {
       if (kDebugMode) {
@@ -245,6 +258,72 @@ class _PrayerTimesWidgetState extends State<PrayerTimesWidget>
         });
       }
     }
+  }
+
+  /// Start listening to compass for real-time updates
+  void _startCompassListening() {
+    try {
+      final compassStream = FlutterCompass.events;
+      if (compassStream != null) {
+        compassStream.listen((CompassEvent event) {
+          if (mounted) {
+            setState(() {
+              _deviceHeading = event.heading;
+              _compassAccuracy = event.accuracy;
+              _checkAlignment();
+            });
+          }
+        });
+      } else {
+        // Fallback to magnetometer
+        _startMagnetometerListening();
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Compass error: $e');
+      }
+      _startMagnetometerListening();
+    }
+  }
+
+  /// Fallback magnetometer listening
+  void _startMagnetometerListening() {
+    try {
+      magnetometerEventStream().listen((MagnetometerEvent event) {
+        if (mounted) {
+          final heading = math.atan2(event.y, event.x) * 180 / math.pi;
+          setState(() {
+            _deviceHeading = (heading + 360) % 360;
+            _compassAccuracy = null; // Magnetometer doesn't provide accuracy
+            _checkAlignment();
+          });
+        }
+      });
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('Magnetometer error: $e');
+      }
+    }
+  }
+
+  /// Check if device is aligned with Qibla direction
+  void _checkAlignment() {
+    if (_qiblaDirection == null || _deviceHeading == null) return;
+    
+    final relativeDirection = (_qiblaDirection! - _deviceHeading! + 360) % 360;
+    final wasAligned = _isCompassAligned;
+    _isCompassAligned = relativeDirection >= 350 || relativeDirection <= 10;
+    
+    // Trigger haptic feedback when first aligned
+    if (_isCompassAligned && !wasAligned) {
+      HapticFeedback.lightImpact();
+    }
+  }
+
+  /// Get relative Qibla direction
+  double? get _relativeQiblaDirection {
+    if (_qiblaDirection == null || _deviceHeading == null) return null;
+    return (_qiblaDirection! - _deviceHeading! + 360) % 360;
   }
 
   Future<void> _getNextPrayerTime(Map<String, dynamic> timings) async {
@@ -598,6 +677,7 @@ class _PrayerTimesWidgetState extends State<PrayerTimesWidget>
       ),
       child: Column(
         children: [
+          // Header Row
           Row(
             children: [
               Container(
@@ -606,9 +686,9 @@ class _PrayerTimesWidgetState extends State<PrayerTimesWidget>
                   color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: const Icon(
-                  Icons.explore_rounded,
-                  color: Colors.white,
+                child: Icon(
+                  _isCompassAligned ? Icons.done_all : Icons.explore_rounded,
+                  color: _isCompassAligned ? Colors.green : Colors.white,
                   size: 28,
                 ),
               ),
@@ -625,71 +705,308 @@ class _PrayerTimesWidgetState extends State<PrayerTimesWidget>
                           ),
                     ),
                     Text(
-                      'Direction to Mecca',
+                      _isCompassAligned ? 'Aligned with Mecca' : 'Real-time Compass',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.white.withValues(alpha: 0.9),
+                            color: _isCompassAligned 
+                              ? Colors.green.shade100
+                              : Colors.white.withValues(alpha: 0.9),
+                            fontWeight: _isCompassAligned ? FontWeight.bold : FontWeight.normal,
                           ),
                     ),
                   ],
                 ),
               ),
+              // Compass Accuracy Indicator
+              if (_compassAccuracy != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: _getAccuracyColor().withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: _getAccuracyColor()),
+                  ),
+                  child: Text(
+                    _getAccuracyText(),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: _getAccuracyColor(),
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                ),
             ],
           ),
           const SizedBox(height: 24),
+          
+          // Real-time Compass
           ScaleTransition(
             scale: _qiblaAnimation,
             child: Container(
-              width: 120,
-              height: 120,
+              width: 160,
+              height: 160,
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.3),
-                  width: 2,
+                  color: _isCompassAligned 
+                    ? Colors.green.withValues(alpha: 0.6)
+                    : Colors.white.withValues(alpha: 0.3),
+                  width: _isCompassAligned ? 3 : 2,
                 ),
+                boxShadow: _isCompassAligned ? [
+                  BoxShadow(
+                    color: Colors.green.withValues(alpha: 0.3),
+                    blurRadius: 12,
+                    spreadRadius: 2,
+                  ),
+                ] : null,
               ),
-              child: Center(
-                child: Transform.rotate(
-                  angle: (_qiblaDirection! * math.pi) / 180,
-                  child: const Icon(
-                    Icons.navigation_rounded,
-                    color: Colors.white,
-                    size: 48,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Compass markings
+                  CustomPaint(
+                    size: const Size(160, 160),
+                    painter: CompactCompassPainter(
+                      theme: Theme.of(context),
+                      isAligned: _isCompassAligned,
+                    ),
+                  ),
+                  
+                  // Qibla needle (green arrow pointing to Mecca)
+                  if (_relativeQiblaDirection != null)
+                    Transform.rotate(
+                      angle: (_relativeQiblaDirection! * math.pi) / 180,
+                      child: Container(
+                        width: 4,
+                        height: 70,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(2),
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: _isCompassAligned ? [
+                              Colors.green.shade300,
+                              Colors.green,
+                              Colors.green.shade700,
+                              Colors.transparent,
+                            ] : [
+                              Colors.white,
+                              Colors.white.withValues(alpha: 0.8),
+                              Colors.white.withValues(alpha: 0.4),
+                              Colors.transparent,
+                            ],
+                            stops: const [0.0, 0.4, 0.7, 1.0],
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: (_isCompassAligned ? Colors.green : Colors.white)
+                                .withValues(alpha: 0.5),
+                              blurRadius: _isCompassAligned ? 6 : 3,
+                              spreadRadius: 1,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  
+                  // North indicator (red dot)
+                  Positioned(
+                    top: 10,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+                  
+                  // Center pulse animation when aligned
+                  AnimatedBuilder(
+                    animation: _pulseController,
+                    builder: (context, child) {
+                      return Container(
+                        width: _isCompassAligned ? 
+                          12 + (4 * _pulseController.value) : 8,
+                        height: _isCompassAligned ? 
+                          12 + (4 * _pulseController.value) : 8,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: _isCompassAligned 
+                            ? Colors.green 
+                            : Colors.white,
+                          boxShadow: _isCompassAligned ? [
+                            BoxShadow(
+                              color: Colors.green.withValues(alpha: 0.6),
+                              blurRadius: 6,
+                              spreadRadius: 1,
+                            ),
+                          ] : null,
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 20),
+          
+          // Direction Info Row
+          Row(
+            children: [
+              // Qibla Direction
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.place,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Qibla',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: Colors.white.withValues(alpha: 0.8),
+                                ),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        '${_qiblaDirection?.toStringAsFixed(1) ?? "0.0"}°',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.explore_rounded,
-                  color: Colors.white,
-                  size: 20,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  '${_qiblaDirection!.toStringAsFixed(1)}°',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
+              
+              const SizedBox(width: 12),
+              
+              // Device Heading
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.navigation,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Heading',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: Colors.white.withValues(alpha: 0.8),
+                                ),
+                          ),
+                        ],
                       ),
+                      Text(
+                        '${_deviceHeading?.toStringAsFixed(0) ?? "---"}°',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                      ),
+                    ],
+                  ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
+          
+          // Alignment Status
+          if (_relativeQiblaDirection != null) ...[
+            const SizedBox(height: 12),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: _isCompassAligned 
+                  ? Colors.green.withValues(alpha: 0.2)
+                  : Colors.white.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: _isCompassAligned ? Colors.green : Colors.white.withValues(alpha: 0.3),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _isCompassAligned ? Icons.check_circle : Icons.rotate_right,
+                    color: _isCompassAligned ? Colors.green : Colors.white,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _isCompassAligned 
+                      ? 'Perfect Alignment!' 
+                      : 'Turn ${_relativeQiblaDirection! > 180 ? 'left' : 'right'} ${(_relativeQiblaDirection! > 180 ? 360 - _relativeQiblaDirection! : _relativeQiblaDirection!).toStringAsFixed(0)}°',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: _isCompassAligned ? Colors.green.shade100 : Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  /// Get compass accuracy color
+  Color _getAccuracyColor() {
+    if (_compassAccuracy == null) return Colors.grey;
+    
+    if (_compassAccuracy! >= 0 && _compassAccuracy! <= 15) {
+      return Colors.green;
+    } else if (_compassAccuracy! <= 30) {
+      return Colors.orange;
+    } else {
+      return Colors.red;
+    }
+  }
+
+  /// Get compass accuracy text
+  String _getAccuracyText() {
+    if (_compassAccuracy == null) return 'Unknown';
+    
+    if (_compassAccuracy! >= 0 && _compassAccuracy! <= 15) {
+      return 'High';
+    } else if (_compassAccuracy! <= 30) {
+      return 'Medium';
+    } else if (_compassAccuracy! <= 45) {
+      return 'Low';
+    } else {
+      return 'Calibrate';
+    }
   }
 
   Widget _buildErrorState(BuildContext context, ColorScheme colorScheme) {
@@ -1024,4 +1341,61 @@ class _PrayerTimesWidgetState extends State<PrayerTimesWidget>
       size: 24,
     );
   }
+}
+
+/// Compact compass painter for the Qibla section
+class CompactCompassPainter extends CustomPainter {
+  final ThemeData theme;
+  final bool isAligned;
+
+  CompactCompassPainter({required this.theme, required this.isAligned});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2;
+    
+    // Major markings (every 45 degrees)
+    final majorPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.4)
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round;
+
+    for (int i = 0; i < 8; i++) {
+      final angle = i * 45 * math.pi / 180;
+      final startPoint = Offset(
+        center.dx + (radius - 20) * math.cos(angle - math.pi / 2),
+        center.dy + (radius - 20) * math.sin(angle - math.pi / 2),
+      );
+      final endPoint = Offset(
+        center.dx + (radius - 8) * math.cos(angle - math.pi / 2),
+        center.dy + (radius - 8) * math.sin(angle - math.pi / 2),
+      );
+      canvas.drawLine(startPoint, endPoint, majorPaint);
+    }
+
+    // Minor markings (every 30 degrees)
+    final minorPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.2)
+      ..strokeWidth = 1
+      ..strokeCap = StrokeCap.round;
+
+    for (int i = 0; i < 12; i++) {
+      if (i % 2 != 0) { // Skip major markings
+        final angle = i * 30 * math.pi / 180;
+        final startPoint = Offset(
+          center.dx + (radius - 15) * math.cos(angle - math.pi / 2),
+          center.dy + (radius - 15) * math.sin(angle - math.pi / 2),
+        );
+        final endPoint = Offset(
+          center.dx + (radius - 8) * math.cos(angle - math.pi / 2),
+          center.dy + (radius - 8) * math.sin(angle - math.pi / 2),
+        );
+        canvas.drawLine(startPoint, endPoint, minorPaint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'dart:math' as math;
 import '../../services/qibla_service.dart';
-import '../providers/preference_settings_provider.dart';
+import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 
 class QiblaScreen extends StatefulWidget {
   const QiblaScreen({super.key});
@@ -16,6 +15,7 @@ class _QiblaScreenState extends State<QiblaScreen>
   late QiblaProvider _qiblaProvider;
   late AnimationController _compassController;
   late AnimationController _pulseController;
+  late AnimationController _alignmentController;
 
   @override
   void initState() {
@@ -29,6 +29,10 @@ class _QiblaScreenState extends State<QiblaScreen>
       duration: const Duration(seconds: 2),
       vsync: this,
     )..repeat();
+    _alignmentController = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
 
     _initializeQibla();
   }
@@ -37,6 +41,7 @@ class _QiblaScreenState extends State<QiblaScreen>
   void dispose() {
     _compassController.dispose();
     _pulseController.dispose();
+    _alignmentController.dispose();
     super.dispose();
   }
 
@@ -109,9 +114,7 @@ class _QiblaScreenState extends State<QiblaScreen>
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.transparent,
-        title: const Text(
-          'Qibla Direction',
-        ),
+        title: const Text('Qibla Direction'),
         actions: [
           IconButton(
             icon: const Icon(Icons.help_outline),
@@ -136,7 +139,29 @@ class _QiblaScreenState extends State<QiblaScreen>
       return _buildErrorState();
     }
 
-    return _buildQiblaCompass();
+    return AnimationLimiter(
+      child: Column(
+        children: AnimationConfiguration.toStaggeredList(
+          duration: const Duration(milliseconds: 600),
+          childAnimationBuilder: (widget) => SlideAnimation(
+            verticalOffset: 50.0,
+            child: FadeInAnimation(child: widget),
+          ),
+          children: [
+            // Accuracy and Status Bar
+            _buildStatusBar(),
+            
+            // Main Compass Area
+            Expanded(
+              child: _buildQiblaCompass(),
+            ),
+            
+            // Bottom Information Panel
+            _buildBottomPanel(),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildLoadingState() {
@@ -205,6 +230,117 @@ class _QiblaScreenState extends State<QiblaScreen>
     );
   }
 
+  Widget _buildStatusBar() {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: LinearGradient(
+          colors: [
+            theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
+            theme.colorScheme.secondaryContainer.withValues(alpha: 0.5),
+          ],
+        ),
+      ),
+      child: Row(
+        children: [
+          // Compass Accuracy
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.speed,
+                      size: 16,
+                      color: _qiblaProvider.accuracyColor,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Accuracy',
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+                Text(
+                  _qiblaProvider.accuracyDescription,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: _qiblaProvider.accuracyColor,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          // Calibration Status
+          if (_qiblaProvider.needsCalibration)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.orange.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.warning_amber,
+                    size: 16,
+                    color: Colors.orange,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Calibrate',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: Colors.orange.shade700,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          
+          // Distance to Mecca
+          if (_qiblaProvider.distanceToMecca != null)
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.place,
+                        size: 16,
+                        color: theme.colorScheme.primary,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Distance',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                  Text(
+                    QiblaService.formatDistance(_qiblaProvider.distanceToMecca!),
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildQiblaCompass() {
     return Center(
       child: Padding(
@@ -212,53 +348,12 @@ class _QiblaScreenState extends State<QiblaScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Distance info
-            _buildDistanceInfo(),
-            const SizedBox(height: 32),
-
-            // Compass
+            // Main Compass
             _buildCompass(),
-            const SizedBox(height: 32),
-
+            const SizedBox(height: 24),
+            
             // Direction info
             _buildDirectionInfo(),
-            const SizedBox(height: 24),
-
-            // Calibration tip
-            _buildCalibrationTip(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDistanceInfo() {
-    final distance = _qiblaProvider.distanceToMecca;
-    if (distance == null) return const SizedBox.shrink();
-    final theme = Theme.of(context);
-
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.place,
-              color: theme.colorScheme.secondary,
-              size: 20,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'Distance to Mecca: ${QiblaService.formatDistance(distance)}',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w500,
-              ),
-            ),
           ],
         ),
       ),
@@ -268,51 +363,67 @@ class _QiblaScreenState extends State<QiblaScreen>
   Widget _buildCompass() {
     final theme = Theme.of(context);
     return SizedBox(
-      width: 280,
-      height: 280,
+      width: 320,
+      height: 320,
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Compass background
+          // Compass background with gradient
           Container(
-            width: 280,
-            height: 280,
+            width: 320,
+            height: 320,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: RadialGradient(
                 colors: [
                   theme.colorScheme.surface,
-                  theme.colorScheme.surfaceVariant,
+                  theme.colorScheme.surfaceContainerHighest,
                 ],
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 10,
-                  spreadRadius: 2,
+                  color: Colors.black.withValues(alpha: 0.15),
+                  blurRadius: 20,
+                  spreadRadius: 5,
                 ),
               ],
             ),
           ),
 
-          // Compass markings
+          // Compass markings and cardinal directions
           _buildCompassMarkings(),
 
           // Qibla direction needle
           if (_qiblaProvider.relativeQiblaDirection != null)
             _buildQiblaNeedle(_qiblaProvider.relativeQiblaDirection!),
 
-          // North indicator
-          _buildNorthIndicator(),
+          // Cardinal direction indicators
+          _buildCardinalDirections(),
 
-          // Center point
-          Container(
-            width: 12,
-            height: 12,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: theme.colorScheme.onSurface,
-            ),
+          // Center point with pulse animation when aligned
+          AnimatedBuilder(
+            animation: _pulseController,
+            builder: (context, child) {
+              return Container(
+                width: _qiblaProvider.isAligned ? 
+                  16 + (4 * _pulseController.value) : 12,
+                height: _qiblaProvider.isAligned ? 
+                  16 + (4 * _pulseController.value) : 12,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _qiblaProvider.isAligned 
+                    ? Colors.green 
+                    : theme.colorScheme.onSurface,
+                  boxShadow: _qiblaProvider.isAligned ? [
+                    BoxShadow(
+                      color: Colors.green.withValues(alpha: 0.6),
+                      blurRadius: 8,
+                      spreadRadius: 2,
+                    ),
+                  ] : null,
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -322,49 +433,97 @@ class _QiblaScreenState extends State<QiblaScreen>
   Widget _buildCompassMarkings() {
     final theme = Theme.of(context);
     return SizedBox(
-      width: 280,
-      height: 280,
+      width: 320,
+      height: 320,
       child: CustomPaint(
-        painter: CompassMarkingsPainter(theme: theme),
+        painter: EnhancedCompassMarkingsPainter(theme: theme),
       ),
     );
   }
 
   Widget _buildQiblaNeedle(double angle) {
-    return Transform.rotate(
-      angle: (angle * math.pi / 180),
-      child: Container(
-        width: 4,
-        height: 120,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(2),
-          gradient: const LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Colors.green, Colors.green, Colors.transparent],
-            stops: [0.0, 0.7, 1.0],
+    return AnimatedBuilder(
+      animation: _alignmentController,
+      builder: (context, child) {
+        return Transform.rotate(
+          angle: (angle * math.pi / 180),
+          child: Container(
+            width: 6,
+            height: 140,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(3),
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: _qiblaProvider.isAligned 
+                  ? [Colors.green.shade400, Colors.green, Colors.green.shade700, Colors.transparent]
+                  : [Colors.green.shade300, Colors.green, Colors.green.shade600, Colors.transparent],
+                stops: const [0.0, 0.4, 0.7, 1.0],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.green.withValues(alpha: 0.6),
+                  blurRadius: _qiblaProvider.isAligned ? 8 : 4,
+                  spreadRadius: _qiblaProvider.isAligned ? 2 : 1,
+                ),
+              ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildNorthIndicator() {
+  Widget _buildCardinalDirections() {
     final theme = Theme.of(context);
-    return Positioned(
-      top: 20,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.error,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Text(
-          'N',
-          style: theme.primaryTextTheme.labelSmall?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+    final directions = ['N', 'E', 'S', 'W'];
+    final colors = [
+      Colors.red,
+      theme.colorScheme.primary,
+      theme.colorScheme.secondary,
+      theme.colorScheme.tertiary,
+    ];
+    
+    return SizedBox(
+      width: 320,
+      height: 320,
+      child: Stack(
+        children: List.generate(4, (index) {
+          final angle = index * 90.0;
+          final angleRad = (angle - 90) * math.pi / 180;
+          final radius = 140.0;
+          final x = 160 + radius * math.cos(angleRad) - 16;
+          final y = 160 + radius * math.sin(angleRad) - 16;
+          
+          return Positioned(
+            left: x,
+            top: y,
+            child: Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: colors[index],
+                boxShadow: [
+                  BoxShadow(
+                    color: colors[index].withValues(alpha: 0.4),
+                    blurRadius: 4,
+                    spreadRadius: 1,
+                  ),
+                ],
+              ),
+              child: Center(
+                child: Text(
+                  directions[index],
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          );
+        }),
       ),
     );
   }
@@ -373,122 +532,199 @@ class _QiblaScreenState extends State<QiblaScreen>
     final relativeDirection = _qiblaProvider.relativeQiblaDirection;
     if (relativeDirection == null) return const SizedBox.shrink();
 
-    final isAligned = relativeDirection >= 350 || relativeDirection <= 10;
+    final isAligned = _qiblaProvider.isAligned;
     final theme = Theme.of(context);
 
-    return Card(
-      elevation: 2,
-      color: isAligned ? Colors.green.withOpacity(0.1) : null,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: isAligned ? Colors.green : theme.dividerColor,
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  isAligned ? Icons.done_all : Icons.explore,
-                  color: isAligned ? Colors.green : theme.colorScheme.onSurface,
-                  size: 20,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  isAligned ? 'Aligned with Qibla!' : 'Turn to align with Qibla',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color:
-                        isAligned ? Colors.green : theme.colorScheme.onSurface,
-                  ),
-                ),
-              ],
-            ),
-            if (!isAligned) ...[
-              const SizedBox(height: 8),
-              Text(
-                'Turn ${relativeDirection > 180 ? 'left' : 'right'} ${relativeDirection > 180 ? 360 - relativeDirection : relativeDirection}°',
-                style: theme.textTheme.bodyMedium,
-              ),
-            ],
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: LinearGradient(
+          colors: isAligned ? [
+            Colors.green.withValues(alpha: 0.2),
+            Colors.green.withValues(alpha: 0.1),
+          ] : [
+            theme.colorScheme.surfaceContainer,
+            theme.colorScheme.surfaceContainerHigh,
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildCalibrationTip() {
-    final theme = Theme.of(context);
-    return GestureDetector(
-      onTap: _showCalibrationInstructions,
-      child: Card(
-        elevation: 0,
-        color: Colors.blue.withOpacity(0.1),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-          side: BorderSide(color: Colors.blue.withOpacity(0.3)),
+        border: Border.all(
+          color: isAligned ? Colors.green : theme.dividerColor,
+          width: 2,
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
+        boxShadow: [
+          BoxShadow(
+            color: (isAligned ? Colors.green : theme.colorScheme.shadow)
+              .withValues(alpha: 0.1),
+            blurRadius: 8,
+            spreadRadius: 2,
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(
-                Icons.info_outline,
-                color: Colors.blue,
-                size: 16,
+              AnimatedRotation(
+                turns: isAligned ? 0.0 : 0.25,
+                duration: const Duration(milliseconds: 300),
+                child: Icon(
+                  isAligned ? Icons.check_circle : Icons.explore,
+                  color: isAligned ? Colors.green : theme.colorScheme.primary,
+                  size: 24,
+                ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 12),
               Text(
-                'Tap for compass calibration tips',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: Colors.blue.shade700,
+                isAligned ? 'Perfectly Aligned with Qibla!' : 'Rotate to align with Qibla',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: isAligned ? Colors.green : theme.colorScheme.onSurface,
                 ),
               ),
             ],
           ),
-        ),
+          if (!isAligned) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.secondaryContainer,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                'Turn ${relativeDirection > 180 ? 'left' : 'right'} ${(relativeDirection > 180 ? 360 - relativeDirection : relativeDirection).toStringAsFixed(0)}°',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.onSecondaryContainer,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomPanel() {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          // Calibration tip
+          Expanded(
+            child: GestureDetector(
+              onTap: _showCalibrationInstructions,
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.info_outline,
+                      color: Colors.blue,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Calibration Tips',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: Colors.blue.shade700,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          
+          const SizedBox(width: 16),
+          
+          // Refresh button
+          Material(
+            color: theme.colorScheme.primary,
+            borderRadius: BorderRadius.circular(12),
+            child: InkWell(
+              onTap: () => _qiblaProvider.refresh(),
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.refresh,
+                      color: theme.colorScheme.onPrimary,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Refresh',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onPrimary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class CompassMarkingsPainter extends CustomPainter {
+class EnhancedCompassMarkingsPainter extends CustomPainter {
   final ThemeData theme;
 
-  CompassMarkingsPainter({required this.theme});
+  EnhancedCompassMarkingsPainter({required this.theme});
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2;
-    final paint = Paint()
-      ..color = theme.colorScheme.onSurface.withOpacity(0.3)
-      ..strokeWidth = 2;
+    
+    // Major markings (every 30 degrees)
+    final majorPaint = Paint()
+      ..color = theme.colorScheme.onSurface.withValues(alpha: 0.4)
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round;
 
-    // Draw major markings (every 30 degrees)
     for (int i = 0; i < 12; i++) {
       final angle = i * 30 * math.pi / 180;
       final startPoint = Offset(
-        center.dx + (radius - 25) * math.cos(angle - math.pi / 2),
-        center.dy + (radius - 25) * math.sin(angle - math.pi / 2),
+        center.dx + (radius - 30) * math.cos(angle - math.pi / 2),
+        center.dy + (radius - 30) * math.sin(angle - math.pi / 2),
       );
       final endPoint = Offset(
         center.dx + (radius - 10) * math.cos(angle - math.pi / 2),
         center.dy + (radius - 10) * math.sin(angle - math.pi / 2),
       );
-      canvas.drawLine(startPoint, endPoint, paint);
+      canvas.drawLine(startPoint, endPoint, majorPaint);
     }
 
-    // Draw minor markings (every 10 degrees)
-    paint.strokeWidth = 1;
+    // Minor markings (every 10 degrees)
+    final minorPaint = Paint()
+      ..color = theme.colorScheme.onSurface.withValues(alpha: 0.2)
+      ..strokeWidth = 1.5
+      ..strokeCap = StrokeCap.round;
+
     for (int i = 0; i < 36; i++) {
       if (i % 3 != 0) {
-        // Skip major markings
         final angle = i * 10 * math.pi / 180;
         final startPoint = Offset(
           center.dx + (radius - 20) * math.cos(angle - math.pi / 2),
@@ -498,8 +734,37 @@ class CompassMarkingsPainter extends CustomPainter {
           center.dx + (radius - 10) * math.cos(angle - math.pi / 2),
           center.dy + (radius - 10) * math.sin(angle - math.pi / 2),
         );
-        canvas.drawLine(startPoint, endPoint, paint);
+        canvas.drawLine(startPoint, endPoint, minorPaint);
       }
+    }
+
+    // Degree numbers (every 30 degrees)
+    final textStyle = TextStyle(
+      color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+      fontSize: 14,
+      fontWeight: FontWeight.w500,
+    );
+
+    for (int i = 0; i < 12; i++) {
+      final angle = i * 30;
+      final angleRad = i * 30 * math.pi / 180;
+      final textPosition = Offset(
+        center.dx + (radius - 45) * math.cos(angleRad - math.pi / 2),
+        center.dy + (radius - 45) * math.sin(angleRad - math.pi / 2),
+      );
+
+      final textPainter = TextPainter(
+        text: TextSpan(text: '${angle}°', style: textStyle),
+        textDirection: TextDirection.ltr,
+      );
+      textPainter.layout();
+      textPainter.paint(
+        canvas,
+        Offset(
+          textPosition.dx - textPainter.width / 2,
+          textPosition.dy - textPainter.height / 2,
+        ),
+      );
     }
   }
 

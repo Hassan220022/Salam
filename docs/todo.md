@@ -77,3 +77,8 @@ things I need to add for the lock screen
         <!-- - Daily Islamic quotes display -->
     - Optimize for different Apple Watch sizes and complications
     - Test synchronization with main Flutter app
+
+
+
+things have to be done very soon is a github stil for commit but for both porn and maserbation and for salah 
+    - it may looks like the one how's tyring to make the vedio editng app
