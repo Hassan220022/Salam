@@ -13,6 +13,7 @@ class _SimpleCacheManagementScreenState
     extends State<SimpleCacheManagementScreen> {
   Map<String, dynamic> _cacheInfo = {};
   bool _isLoading = false;
+  String? _errorMessage;
   int _downloadProgress = 0;
 
   @override
@@ -22,24 +23,73 @@ class _SimpleCacheManagementScreenState
   }
 
   Future<void> _loadCacheInfo() async {
+    if (!mounted) return;
+    
     setState(() {
       _isLoading = true;
+      _errorMessage = null;
     });
 
     try {
       final cacheInfo = await AutoCacheService.getCacheInfo();
-      setState(() {
-        _cacheInfo = cacheInfo;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _cacheInfo = cacheInfo;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Failed to load cache information. Please try again.';
+        });
+      }
+    }
+  }
+
+  Future<void> _preloadPopularSurahs() async {
+    if (!mounted) return;
+    
+    setState(() {
+      _isLoading = true;
+      _downloadProgress = 0;
+    });
+
+    try {
+      await AutoCacheService.preloadPopularSurahs();
+      await _loadCacheInfo();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Popular surahs (9) cached for offline reading'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to cache popular surahs: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+
+    if (mounted) {
       setState(() {
         _isLoading = false;
+        _downloadProgress = 0;
       });
     }
   }
 
   Future<void> _cacheCommonSurahs() async {
+    if (!mounted) return;
+    
     setState(() {
       _isLoading = true;
       _downloadProgress = 0;
@@ -48,9 +98,11 @@ class _SimpleCacheManagementScreenState
     try {
       await AutoCacheService.cacheCommonSurahs(
         onProgress: (current, total) {
-          setState(() {
-            _downloadProgress = current;
-          });
+          if (mounted) {
+            setState(() {
+              _downloadProgress = current;
+            });
+          }
         },
       );
       await _loadCacheInfo();
@@ -74,20 +126,27 @@ class _SimpleCacheManagementScreenState
       }
     }
 
-    setState(() {
-      _isLoading = false;
-      _downloadProgress = 0;
-    });
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+        _downloadProgress = 0;
+      });
+    }
   }
 
   Future<void> _cacheAllSurahs() async {
+    if (!mounted) return;
+    
+    final theme = Theme.of(context);
     final shouldCache = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Cache All Surahs'),
-        content: const Text(
-          'This will download all 114 surahs for complete offline access. '
-          'This may take several minutes and use considerable storage space.',
+        content: const SingleChildScrollView(
+          child: Text(
+            'This will download all 114 surahs for complete offline access. '
+            'This may take several minutes and use considerable storage space.',
+          ),
         ),
         actions: [
           TextButton(
@@ -97,7 +156,8 @@ class _SimpleCacheManagementScreenState
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
+              backgroundColor: theme.colorScheme.primary,
+              foregroundColor: theme.colorScheme.onPrimary,
             ),
             child: const Text('Download All'),
           ),
@@ -105,7 +165,7 @@ class _SimpleCacheManagementScreenState
       ),
     );
 
-    if (shouldCache == true) {
+    if (shouldCache == true && mounted) {
       setState(() {
         _isLoading = true;
         _downloadProgress = 0;
@@ -114,9 +174,11 @@ class _SimpleCacheManagementScreenState
       try {
         await AutoCacheService.cacheAllSurahs(
           onProgress: (current, total) {
-            setState(() {
-              _downloadProgress = current;
-            });
+            if (mounted) {
+              setState(() {
+                _downloadProgress = current;
+              });
+            }
           },
         );
         await _loadCacheInfo();
@@ -142,10 +204,12 @@ class _SimpleCacheManagementScreenState
         }
       }
 
-      setState(() {
-        _isLoading = false;
-        _downloadProgress = 0;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _downloadProgress = 0;
+        });
+      }
     }
   }
 
@@ -153,169 +217,201 @@ class _SimpleCacheManagementScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Cache & Offline',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-        backgroundColor: const Color(0xFF091945),
-        iconTheme: const IconThemeData(color: Colors.white),
+        title: const Text('Cache & Offline'),
         elevation: 0,
       ),
       body: _isLoading
-          ? const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(
-                    valueColor:
-                        AlwaysStoppedAnimation<Color>(Color(0xFF091945)),
-                  ),
-                  SizedBox(height: 16),
-                  Text(
-                    'Loading cache information...',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey,
+          ? _buildLoadingIndicator()
+          : _errorMessage != null
+              ? _buildErrorState()
+              : RefreshIndicator(
+                  onRefresh: _loadCacheInfo,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildCacheOverviewCard(),
+                        const SizedBox(height: 16),
+                        _buildOfflineStatusCard(),
+                        const SizedBox(height: 16),
+                        _buildCacheActionsCard(),
+                        const SizedBox(height: 16),
+                        _buildInfoCard(),
+                      ],
                     ),
                   ),
-                ],
-              ),
-            )
-          : RefreshIndicator(
-              onRefresh: _loadCacheInfo,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Cache Overview Card
-                    _buildCacheOverviewCard(),
-                    const SizedBox(height: 16),
-
-                    // Offline Status Card
-                    _buildOfflineStatusCard(),
-                    const SizedBox(height: 16),
-
-                    // Cache Actions Card
-                    _buildCacheActionsCard(),
-                    const SizedBox(height: 16),
-
-                    // Information Card
-                    _buildInfoCard(),
-                  ],
                 ),
-              ),
+    );
+  }
+
+  Widget _buildLoadingIndicator() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const CircularProgressIndicator(),
+          const SizedBox(height: 16),
+          Text(
+            _downloadProgress > 0
+                ? 'Caching... $_downloadProgress/114'
+                : 'Loading cache information...',
+            style: Theme.of(context).textTheme.bodyLarge,
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.error_outline,
+              size: 64,
+              color: Theme.of(context).colorScheme.error,
             ),
+            const SizedBox(height: 16),
+            Text(
+              'Something Went Wrong',
+              style: Theme.of(context).textTheme.headlineSmall,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _errorMessage ?? 'Unknown error occurred',
+              style: Theme.of(context).textTheme.bodyLarge,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _loadCacheInfo,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Try Again'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
   Widget _buildCacheOverviewCard() {
     final cachedSurahs = _cacheInfo['cached_surahs'] ?? 0;
     final cacheSize = _cacheInfo['cache_size_kb'] ?? '0.00';
+    final theme = Theme.of(context);
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF667eea), Color(0xFF764ba2)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF667eea).withOpacity(0.3),
-            spreadRadius: 2,
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(
-                Icons.storage,
-                color: Colors.white,
-                size: 28,
-              ),
-              SizedBox(width: 16),
-              Text(
-                'Cache Overview',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              theme.colorScheme.primary,
+              theme.colorScheme.primaryContainer
             ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: _buildCacheMetric(
-                  'Cached Surahs',
-                  '$cachedSurahs',
-                  Icons.book,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _buildCacheMetric(
-                  'Storage Used',
-                  '$cacheSize KB',
+          borderRadius: BorderRadius.circular(15),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
                   Icons.storage,
+                  color: theme.colorScheme.onPrimary,
+                  size: 28,
                 ),
-              ),
-            ],
-          ),
-        ],
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    'Cache Overview',
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      color: theme.colorScheme.onPrimary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildCacheMetric(
+                    'Cached Surahs',
+                    '$cachedSurahs',
+                    Icons.book,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: _buildCacheMetric(
+                    'Storage Used',
+                    '$cacheSize KB',
+                    Icons.storage,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildCacheMetric(String label, String value, IconData icon) {
+    final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
+        color: theme.colorScheme.onPrimary.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: Colors.white.withOpacity(0.2),
+          color: theme.colorScheme.onPrimary.withValues(alpha: 0.2),
           width: 1,
         ),
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
             icon,
-            color: Colors.white,
-            size: 24,
+            color: theme.colorScheme.onPrimary,
+            size: 20,
           ),
           const SizedBox(height: 8),
           Text(
             value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: theme.colorScheme.onPrimary,
               fontWeight: FontWeight.bold,
             ),
+            textAlign: TextAlign.center,
+            overflow: TextOverflow.ellipsis,
           ),
+          const SizedBox(height: 4),
           Text(
             label,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.8),
-              fontSize: 12,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onPrimary.withValues(alpha: 0.8),
             ),
             textAlign: TextAlign.center,
+            overflow: TextOverflow.ellipsis,
+            maxLines: 2,
           ),
         ],
       ),
@@ -324,343 +420,323 @@ class _SimpleCacheManagementScreenState
 
   Widget _buildOfflineStatusCard() {
     final offlineStatus = _cacheInfo['offline_status'] ?? 'No offline content';
-    final hasOfflineContent = _cacheInfo['cached_surahs'] > 0;
+    final hasOfflineContent = (_cacheInfo['cached_surahs'] ?? 0) > 0;
+    final theme = Theme.of(context);
+    final color = hasOfflineContent
+        ? theme.colorScheme.primary
+        : theme.colorScheme.secondary;
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: hasOfflineContent
-              ? [Colors.green.shade400, Colors.green.shade600]
-              : [Colors.orange.shade400, Colors.orange.shade600],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: (hasOfflineContent ? Colors.green : Colors.orange)
-                .withOpacity(0.3),
-            spreadRadius: 2,
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
       ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              hasOfflineContent ? Icons.offline_pin : Icons.cloud_off,
-              color: Colors.white,
-              size: 28,
-            ),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [color, color.withValues(alpha: 0.7)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  hasOfflineContent ? 'Offline Ready' : 'Online Only',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Text(
-                  offlineStatus,
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.9),
-                    fontSize: 14,
-                  ),
-                ),
-              ],
+          borderRadius: BorderRadius.circular(15),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.onPrimary.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                hasOfflineContent ? Icons.offline_pin : Icons.cloud_off,
+                color: theme.colorScheme.onPrimary,
+                size: 28,
+              ),
             ),
-          ),
-        ],
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    hasOfflineContent ? 'Offline Ready' : 'Online Only',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      color: theme.colorScheme.onPrimary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    offlineStatus,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onPrimary.withValues(alpha: 0.9),
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 2,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildCacheActionsCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Colors.deepPurple.shade400, Colors.deepPurple.shade600],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+    final theme = Theme.of(context);
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.deepPurple.withOpacity(0.3),
-            spreadRadius: 2,
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(
-                Icons.settings,
-                color: Colors.white,
-                size: 28,
-              ),
-              SizedBox(width: 16),
-              Text(
-                'Cache Actions',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              theme.colorScheme.tertiary,
+              theme.colorScheme.tertiaryContainer
             ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
-          const SizedBox(height: 20),
+          borderRadius: BorderRadius.circular(15),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.settings,
+                  color: theme.colorScheme.onTertiary,
+                  size: 28,
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    'Cache Actions',
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      color: theme.colorScheme.onTertiary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
 
-          // Preload Popular Surahs Button (9 surahs)
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _isLoading
-                  ? null
-                  : () async {
-                      setState(() {
-                        _isLoading = true;
-                      });
-
-                      try {
-                        await AutoCacheService.preloadPopularSurahs();
-                        await _loadCacheInfo();
-
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                  'Popular surahs (9) cached for offline reading'),
-                              backgroundColor: Colors.green,
-                            ),
-                          );
-                        }
-                      } catch (e) {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Failed to cache surahs: $e'),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                        }
-                      }
-
-                      setState(() {
-                        _isLoading = false;
-                      });
-                    },
-              icon: const Icon(Icons.download, color: Colors.white),
-              label: const Text(
-                'Cache Popular Surahs (9)',
-                style: TextStyle(color: Colors.white, fontSize: 16),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green.withOpacity(0.8),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+            // Cache Popular Surahs Button (9 surahs)
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _isLoading ? null : _preloadPopularSurahs,
+                icon: const Icon(Icons.download, size: 20),
+                label: const Text(
+                  'Cache Popular Surahs (9)',
+                  style: TextStyle(fontSize: 14),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               ),
             ),
-          ),
 
-          const SizedBox(height: 12),
+            const SizedBox(height: 12),
 
-          // Cache Common Surahs Button (14 surahs)
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _isLoading ? null : _cacheCommonSurahs,
-              icon: const Icon(Icons.library_books, color: Colors.white),
-              label: const Text(
-                'Cache Common Surahs (14)',
-                style: TextStyle(color: Colors.white, fontSize: 16),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue.withOpacity(0.8),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+            // Cache Common Surahs Button (14 surahs)
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _isLoading ? null : _cacheCommonSurahs,
+                icon: const Icon(Icons.library_books, size: 20),
+                label: const Text(
+                  'Cache Common Surahs (14)',
+                  style: TextStyle(fontSize: 14),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               ),
             ),
-          ),
 
-          const SizedBox(height: 12),
+            const SizedBox(height: 12),
 
-          // Cache All Surahs Button (114 surahs)
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _isLoading ? null : _cacheAllSurahs,
-              icon: const Icon(Icons.cloud_download, color: Colors.white),
-              label: Text(
-                _isLoading && _downloadProgress > 0
-                    ? 'Caching All Surahs... $_downloadProgress/114'
-                    : 'Cache All Surahs (114) - Full Offline',
-                style: const TextStyle(color: Colors.white, fontSize: 16),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.orange.withOpacity(0.8),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+            // Cache All Surahs Button (114 surahs)
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _isLoading ? null : _cacheAllSurahs,
+                icon: const Icon(Icons.cloud_download, size: 20),
+                label: Text(
+                  _isLoading && _downloadProgress > 0
+                      ? 'Caching... $_downloadProgress/114'
+                      : 'Cache All Surahs (114)',
+                  style: const TextStyle(fontSize: 14),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               ),
             ),
-          ),
 
-          const SizedBox(height: 12),
+            const SizedBox(height: 12),
 
-          // Clear Cache Button
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _isLoading
-                  ? null
-                  : () async {
-                      final shouldClear = await showDialog<bool>(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          title: const Text('Clear Cache'),
-                          content: const Text(
-                            'This will delete all cached Quran content. You\'ll need an internet connection to download them again.',
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context, false),
-                              child: const Text('Cancel'),
-                            ),
-                            ElevatedButton(
-                              onPressed: () => Navigator.pop(context, true),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.red,
-                              ),
-                              child: const Text('Clear Cache'),
-                            ),
-                          ],
-                        ),
-                      );
-
-                      if (shouldClear == true) {
-                        setState(() {
-                          _isLoading = true;
-                        });
-
-                        try {
-                          await AutoCacheService.clearAllCache();
-                          await _loadCacheInfo();
-
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Cache cleared successfully'),
-                                backgroundColor: Colors.green,
-                              ),
-                            );
-                          }
-                        } catch (e) {
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Failed to clear cache: $e'),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                          }
-                        }
-
-                        setState(() {
-                          _isLoading = false;
-                        });
-                      }
-                    },
-              icon: const Icon(Icons.delete_sweep, color: Colors.white),
-              label: const Text(
-                'Clear All Cache',
-                style: TextStyle(color: Colors.white, fontSize: 16),
-              ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red.withOpacity(0.8),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+            // Clear Cache Button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _isLoading ? null : _showClearCacheDialog,
+                icon: const Icon(Icons.delete_sweep, size: 20),
+                label: const Text(
+                  'Clear All Cache',
+                  style: TextStyle(fontSize: 14),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: theme.colorScheme.errorContainer,
+                  foregroundColor: theme.colorScheme.onErrorContainer,
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildInfoCard() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade50,
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(
-                Icons.info_outline,
-                color: Color(0xFF091945),
-                size: 28,
-              ),
-              SizedBox(width: 16),
-              Text(
-                'About Permanent Caching',
-                style: TextStyle(
-                  color: Color(0xFF091945),
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
+  Future<void> _showClearCacheDialog() async {
+    if (!mounted) return;
+    
+    final theme = Theme.of(context);
+    final shouldClear = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear Cache'),
+        content: const Text(
+          'This will delete all cached Quran content. You\'ll need an internet connection to download them again.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
           ),
-          const SizedBox(height: 16),
-          const Text(
-            '• Surahs are automatically cached when you read them\n'
-            '• Cached content remains until you manually remove it\n'
-            '• No automatic expiration - permanent offline storage\n'
-            '• Download once, read forever without internet\n'
-            '• Cache is stored using device\'s secure storage',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.black87,
-              height: 1.5,
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: theme.colorScheme.error,
+              foregroundColor: theme.colorScheme.onError,
             ),
+            child: const Text('Clear Cache'),
           ),
         ],
+      ),
+    );
+
+    if (shouldClear == true && mounted) {
+      setState(() {
+        _isLoading = true;
+      });
+
+      try {
+        await AutoCacheService.clearAllCache();
+        await _loadCacheInfo();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Cache cleared successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to clear cache: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Widget _buildInfoCard() {
+    final theme = Theme.of(context);
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(15),
+        side: BorderSide(color: theme.dividerColor),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  color: theme.colorScheme.secondary,
+                  size: 28,
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    'About Permanent Caching',
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      color: theme.colorScheme.secondary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              '• Surahs are automatically cached when you read them\n'
+              '• Cached content remains until you manually remove it\n'
+              '• No automatic expiration - permanent offline storage\n'
+              '• Download once, read forever without internet\n'
+              '• Cache is stored using device\'s secure storage',
+              style: theme.textTheme.bodyMedium?.copyWith(height: 1.5),
+            ),
+          ],
+        ),
       ),
     );
   }

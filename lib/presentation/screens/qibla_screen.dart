@@ -105,84 +105,56 @@ class _QiblaScreenState extends State<QiblaScreen>
 
   @override
   Widget build(BuildContext context) {
-    final isDarkTheme =
-        Provider.of<PreferenceSettingsProvider>(context).isDarkTheme;
-
     return Scaffold(
-      backgroundColor: isDarkTheme ? const Color(0xFF091945) : Colors.white,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
         elevation: 0,
-        title: Text(
+        backgroundColor: Colors.transparent,
+        title: const Text(
           'Qibla Direction',
-          style: TextStyle(
-            color: isDarkTheme ? Colors.white : const Color(0xFF091945),
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        leading: IconButton(
-          icon: Icon(
-            Icons.arrow_back,
-            color: isDarkTheme ? Colors.white : const Color(0xFF091945),
-          ),
-          onPressed: () => Navigator.pop(context),
         ),
         actions: [
           IconButton(
-            icon: Icon(
-              Icons.help_outline,
-              color: isDarkTheme ? Colors.white : const Color(0xFF091945),
-            ),
+            icon: const Icon(Icons.help_outline),
             onPressed: _showCalibrationInstructions,
           ),
           IconButton(
-            icon: Icon(
-              Icons.refresh,
-              color: isDarkTheme ? Colors.white : const Color(0xFF091945),
-            ),
+            icon: const Icon(Icons.refresh),
             onPressed: () => _qiblaProvider.refresh(),
           ),
         ],
       ),
-      body: _buildBody(isDarkTheme),
+      body: _buildBody(),
     );
   }
 
-  Widget _buildBody(bool isDarkTheme) {
+  Widget _buildBody() {
     if (_qiblaProvider.isLoading) {
-      return _buildLoadingState(isDarkTheme);
+      return _buildLoadingState();
     }
 
     if (_qiblaProvider.error != null) {
-      return _buildErrorState(isDarkTheme);
+      return _buildErrorState();
     }
 
-    return _buildQiblaCompass(isDarkTheme);
+    return _buildQiblaCompass();
   }
 
-  Widget _buildLoadingState(bool isDarkTheme) {
+  Widget _buildLoadingState() {
+    final theme = Theme.of(context);
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF667eea)),
-          ),
+          const CircularProgressIndicator(),
           const SizedBox(height: 24),
           Text(
             'Finding Qibla Direction...',
-            style: TextStyle(
-              fontSize: 18,
-              color: isDarkTheme ? Colors.white : const Color(0xFF091945),
-            ),
+            style: theme.textTheme.headlineSmall,
           ),
           const SizedBox(height: 8),
           Text(
             'Getting your location and calculating direction to Mecca',
-            style: TextStyle(
-              fontSize: 14,
-              color: isDarkTheme ? Colors.white70 : Colors.grey.shade600,
-            ),
+            style: theme.textTheme.bodyLarge,
             textAlign: TextAlign.center,
           ),
         ],
@@ -190,7 +162,8 @@ class _QiblaScreenState extends State<QiblaScreen>
     );
   }
 
-  Widget _buildErrorState(bool isDarkTheme) {
+  Widget _buildErrorState() {
+    final theme = Theme.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -200,25 +173,18 @@ class _QiblaScreenState extends State<QiblaScreen>
             Icon(
               Icons.error_outline,
               size: 64,
-              color: isDarkTheme ? Colors.red.shade300 : Colors.red,
+              color: theme.colorScheme.error,
             ),
             const SizedBox(height: 16),
             Text(
               'Unable to determine Qibla direction',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: isDarkTheme ? Colors.white : const Color(0xFF091945),
-              ),
+              style: theme.textTheme.headlineSmall,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
               _qiblaProvider.error ?? 'Unknown error occurred',
-              style: TextStyle(
-                fontSize: 14,
-                color: isDarkTheme ? Colors.white70 : Colors.grey.shade600,
-              ),
+              style: theme.textTheme.bodyLarge,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
@@ -227,8 +193,8 @@ class _QiblaScreenState extends State<QiblaScreen>
               icon: const Icon(Icons.refresh),
               label: const Text('Try Again'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF667eea),
-                foregroundColor: Colors.white,
+                foregroundColor: theme.colorScheme.onError,
+                backgroundColor: theme.colorScheme.error,
                 padding:
                     const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               ),
@@ -239,7 +205,7 @@ class _QiblaScreenState extends State<QiblaScreen>
     );
   }
 
-  Widget _buildQiblaCompass(bool isDarkTheme) {
+  Widget _buildQiblaCompass() {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -247,59 +213,60 @@ class _QiblaScreenState extends State<QiblaScreen>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             // Distance info
-            _buildDistanceInfo(isDarkTheme),
+            _buildDistanceInfo(),
             const SizedBox(height: 32),
 
             // Compass
-            _buildCompass(isDarkTheme),
+            _buildCompass(),
             const SizedBox(height: 32),
 
             // Direction info
-            _buildDirectionInfo(isDarkTheme),
+            _buildDirectionInfo(),
             const SizedBox(height: 24),
 
             // Calibration tip
-            _buildCalibrationTip(isDarkTheme),
+            _buildCalibrationTip(),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildDistanceInfo(bool isDarkTheme) {
+  Widget _buildDistanceInfo() {
     final distance = _qiblaProvider.distanceToMecca;
     if (distance == null) return const SizedBox.shrink();
+    final theme = Theme.of(context);
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color:
-            isDarkTheme ? Colors.white.withOpacity(0.1) : Colors.grey.shade100,
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.place,
-            color: isDarkTheme ? Colors.white : const Color(0xFF091945),
-            size: 20,
-          ),
-          const SizedBox(width: 8),
-          Text(
-            'Distance to Mecca: ${QiblaService.formatDistance(distance)}',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-              color: isDarkTheme ? Colors.white : const Color(0xFF091945),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.place,
+              color: theme.colorScheme.secondary,
+              size: 20,
             ),
-          ),
-        ],
+            const SizedBox(width: 8),
+            Text(
+              'Distance to Mecca: ${QiblaService.formatDistance(distance)}',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildCompass(bool isDarkTheme) {
+  Widget _buildCompass() {
+    final theme = Theme.of(context);
     return SizedBox(
       width: 280,
       height: 280,
@@ -314,12 +281,8 @@ class _QiblaScreenState extends State<QiblaScreen>
               shape: BoxShape.circle,
               gradient: RadialGradient(
                 colors: [
-                  isDarkTheme
-                      ? Colors.white.withOpacity(0.1)
-                      : Colors.grey.shade100,
-                  isDarkTheme
-                      ? Colors.white.withOpacity(0.05)
-                      : Colors.grey.shade50,
+                  theme.colorScheme.surface,
+                  theme.colorScheme.surfaceVariant,
                 ],
               ),
               boxShadow: [
@@ -333,14 +296,14 @@ class _QiblaScreenState extends State<QiblaScreen>
           ),
 
           // Compass markings
-          _buildCompassMarkings(isDarkTheme),
+          _buildCompassMarkings(),
 
           // Qibla direction needle
           if (_qiblaProvider.relativeQiblaDirection != null)
             _buildQiblaNeedle(_qiblaProvider.relativeQiblaDirection!),
 
           // North indicator
-          _buildNorthIndicator(isDarkTheme),
+          _buildNorthIndicator(),
 
           // Center point
           Container(
@@ -348,7 +311,7 @@ class _QiblaScreenState extends State<QiblaScreen>
             height: 12,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: isDarkTheme ? Colors.white : const Color(0xFF091945),
+              color: theme.colorScheme.onSurface,
             ),
           ),
         ],
@@ -356,12 +319,13 @@ class _QiblaScreenState extends State<QiblaScreen>
     );
   }
 
-  Widget _buildCompassMarkings(bool isDarkTheme) {
+  Widget _buildCompassMarkings() {
+    final theme = Theme.of(context);
     return SizedBox(
       width: 280,
       height: 280,
       child: CustomPaint(
-        painter: CompassMarkingsPainter(isDarkTheme: isDarkTheme),
+        painter: CompassMarkingsPainter(theme: theme),
       ),
     );
   }
@@ -385,20 +349,19 @@ class _QiblaScreenState extends State<QiblaScreen>
     );
   }
 
-  Widget _buildNorthIndicator(bool isDarkTheme) {
+  Widget _buildNorthIndicator() {
+    final theme = Theme.of(context);
     return Positioned(
       top: 20,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: Colors.red,
+          color: theme.colorScheme.error,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: const Text(
+        child: Text(
           'N',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 12,
+          style: theme.primaryTextTheme.labelSmall?.copyWith(
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -406,96 +369,88 @@ class _QiblaScreenState extends State<QiblaScreen>
     );
   }
 
-  Widget _buildDirectionInfo(bool isDarkTheme) {
+  Widget _buildDirectionInfo() {
     final relativeDirection = _qiblaProvider.relativeQiblaDirection;
     if (relativeDirection == null) return const SizedBox.shrink();
 
     final isAligned = relativeDirection >= 350 || relativeDirection <= 10;
+    final theme = Theme.of(context);
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: isAligned
-            ? Colors.green.withOpacity(0.1)
-            : (isDarkTheme
-                ? Colors.white.withOpacity(0.05)
-                : Colors.grey.shade50),
+    return Card(
+      elevation: 2,
+      color: isAligned ? Colors.green.withOpacity(0.1) : null,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isAligned
-              ? Colors.green
-              : (isDarkTheme
-                  ? Colors.white.withOpacity(0.2)
-                  : Colors.grey.shade300),
+        side: BorderSide(
+          color: isAligned ? Colors.green : theme.dividerColor,
         ),
       ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                isAligned ? Icons.done_all : Icons.explore,
-                color: isAligned
-                    ? Colors.green
-                    : (isDarkTheme ? Colors.white : const Color(0xFF091945)),
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                isAligned ? 'Aligned with Qibla!' : 'Turn to align with Qibla',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: isAligned
-                      ? Colors.green
-                      : (isDarkTheme ? Colors.white : const Color(0xFF091945)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  isAligned ? Icons.done_all : Icons.explore,
+                  color: isAligned ? Colors.green : theme.colorScheme.onSurface,
+                  size: 20,
                 ),
+                const SizedBox(width: 8),
+                Text(
+                  isAligned ? 'Aligned with Qibla!' : 'Turn to align with Qibla',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color:
+                        isAligned ? Colors.green : theme.colorScheme.onSurface,
+                  ),
+                ),
+              ],
+            ),
+            if (!isAligned) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Turn ${relativeDirection > 180 ? 'left' : 'right'} ${relativeDirection > 180 ? 360 - relativeDirection : relativeDirection}°',
+                style: theme.textTheme.bodyMedium,
               ),
             ],
-          ),
-          if (!isAligned) ...[
-            const SizedBox(height: 8),
-            Text(
-              'Turn ${relativeDirection > 180 ? 'left' : 'right'} ${relativeDirection > 180 ? 360 - relativeDirection : relativeDirection}°',
-              style: TextStyle(
-                fontSize: 14,
-                color: isDarkTheme ? Colors.white70 : Colors.grey.shade600,
-              ),
-            ),
           ],
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildCalibrationTip(bool isDarkTheme) {
+  Widget _buildCalibrationTip() {
+    final theme = Theme.of(context);
     return GestureDetector(
       onTap: _showCalibrationInstructions,
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.blue.withOpacity(0.1),
+      child: Card(
+        elevation: 0,
+        color: Colors.blue.withOpacity(0.1),
+        shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.blue.withOpacity(0.3)),
+          side: BorderSide(color: Colors.blue.withOpacity(0.3)),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.info_outline,
-              color: Colors.blue,
-              size: 16,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              'Tap for compass calibration tips',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.blue.shade700,
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.info_outline,
+                color: Colors.blue,
+                size: 16,
               ),
-            ),
-          ],
+              const SizedBox(width: 8),
+              Text(
+                'Tap for compass calibration tips',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: Colors.blue.shade700,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -503,17 +458,16 @@ class _QiblaScreenState extends State<QiblaScreen>
 }
 
 class CompassMarkingsPainter extends CustomPainter {
-  final bool isDarkTheme;
+  final ThemeData theme;
 
-  CompassMarkingsPainter({required this.isDarkTheme});
+  CompassMarkingsPainter({required this.theme});
 
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2;
     final paint = Paint()
-      ..color =
-          isDarkTheme ? Colors.white.withOpacity(0.3) : Colors.grey.shade400
+      ..color = theme.colorScheme.onSurface.withOpacity(0.3)
       ..strokeWidth = 2;
 
     // Draw major markings (every 30 degrees)

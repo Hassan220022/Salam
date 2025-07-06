@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:salam/core/utils/app_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'main_screen.dart';
 
@@ -19,35 +20,35 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       description:
           "Your comprehensive digital companion for reading the Holy Quran with beautiful recitations and translations.",
       image: "assets/icon_quran.png",
-      gradient: [Color(0xFF667eea), Color(0xFF764ba2)],
+      gradientType: AppThemeGradient.islamic,
     ),
     OnboardingData(
       title: "Read & Listen",
       description:
           "Access all 114 Surahs with crystal-clear Arabic text, audio recitations, and multiple language translations.",
       image: "assets/basmallah.png",
-      gradient: [Color(0xFF4CAF50), Color(0xFF45a049)],
+      gradientType: AppThemeGradient.ocean,
     ),
     OnboardingData(
       title: "Prayer Times",
       description:
           "Never miss a prayer with accurate timing based on your location and customizable notifications.",
       image: "assets/icon/kaaba.png",
-      gradient: [Color(0xFF2196F3), Color(0xFF1976D2)],
+      gradientType: AppThemeGradient.forest,
     ),
     OnboardingData(
       title: "Offline Reading",
       description:
           "Download Surahs for offline access. Read anywhere, anytime without internet connection.",
       image: "assets/icon/dome.png",
-      gradient: [Color(0xFFFF9800), Color(0xFFE65100)],
+      gradientType: AppThemeGradient.sunset,
     ),
     OnboardingData(
       title: "Bookmarks & Progress",
       description:
           "Save your favorite verses, track reading progress, and continue from where you left off.",
       image: "assets/icon_quran_white.png",
-      gradient: [Color(0xFF9C27B0), Color(0xFF7B1FA2)],
+      gradientType: AppThemeGradient.royal,
     ),
   ];
 
@@ -56,11 +57,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: _pages[_currentPage].gradient,
-          ),
+          gradient: AppTheme.getGradient(_pages[_currentPage].gradientType),
         ),
         child: SafeArea(
           child: Column(
@@ -236,7 +233,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.white,
-              foregroundColor: _pages[_currentPage].gradient[1],
+              foregroundColor: Theme.of(context).colorScheme.primary,
               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(30),
@@ -278,12 +275,12 @@ class OnboardingData {
   final String title;
   final String description;
   final String image;
-  final List<Color> gradient;
+  final AppThemeGradient gradientType;
 
   OnboardingData({
     required this.title,
     required this.description,
     required this.image,
-    required this.gradient,
+    required this.gradientType,
   });
 }

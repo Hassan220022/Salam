@@ -131,8 +131,8 @@ class _SearchScreenState extends State<SearchScreen>
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [
-                      const Color(0xFF667eea),
-                      const Color(0xFF764ba2),
+                      Theme.of(context).colorScheme.primary,
+                      Theme.of(context).colorScheme.secondary,
                     ],
                   ),
                 ),
@@ -149,12 +149,15 @@ class _SearchScreenState extends State<SearchScreen>
                             Container(
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.2),
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onPrimary
+                                    .withOpacity(0.2),
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              child: const Icon(
+                              child: Icon(
                                 Icons.search,
-                                color: Colors.white,
+                                color: Theme.of(context).colorScheme.onPrimary,
                                 size: 18,
                               ),
                             ),
@@ -170,7 +173,9 @@ class _SearchScreenState extends State<SearchScreen>
                                         .textTheme
                                         .titleMedium
                                         ?.copyWith(
-                                          color: Colors.white,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onPrimary,
                                           fontWeight: FontWeight.bold,
                                         ),
                                   ),
@@ -180,8 +185,10 @@ class _SearchScreenState extends State<SearchScreen>
                                         .textTheme
                                         .bodySmall
                                         ?.copyWith(
-                                          color: Colors.white
-                                              .withValues(alpha: 0.9),
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onPrimary
+                                              .withOpacity(0.9),
                                         ),
                                   ),
                                 ],
@@ -255,9 +262,12 @@ class _SearchScreenState extends State<SearchScreen>
                           indicatorSize: TabBarIndicatorSize.tab,
                           dividerColor: Colors.transparent,
                           labelColor: Colors.white,
-                          labelStyle: const TextStyle(
-                              fontSize: 11, fontWeight: FontWeight.w600),
-                          unselectedLabelStyle: const TextStyle(fontSize: 11),
+                          labelStyle: Theme.of(context)
+                              .primaryTextTheme
+                              .labelSmall
+                              ?.copyWith(fontWeight: FontWeight.w600),
+                          unselectedLabelStyle:
+                              Theme.of(context).textTheme.labelSmall,
                           unselectedLabelColor:
                               Theme.of(context).colorScheme.onSurfaceVariant,
                           labelPadding: EdgeInsets.zero,
@@ -328,7 +338,7 @@ class _SearchScreenState extends State<SearchScreen>
               color: Theme.of(context)
                   .colorScheme
                   .errorContainer
-                  .withValues(alpha: 0.3),
+                  .withOpacity(0.3),
               shape: BoxShape.circle,
             ),
             child: Icon(
@@ -377,7 +387,7 @@ class _SearchScreenState extends State<SearchScreen>
               color: Theme.of(context)
                   .colorScheme
                   .primaryContainer
-                  .withValues(alpha: 0.3),
+                  .withOpacity(0.3),
               shape: BoxShape.circle,
             ),
             child: Icon(
@@ -434,6 +444,7 @@ class _SearchScreenState extends State<SearchScreen>
                 .contains(_currentQuery.toLowerCase()) ||
             surah.name.contains(_currentQuery) ||
             surah.number.toString() == _currentQuery);
+    final theme = Theme.of(context);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -443,8 +454,8 @@ class _SearchScreenState extends State<SearchScreen>
           borderRadius: BorderRadius.circular(16),
           side: BorderSide(
             color: isHighlighted
-                ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.5)
-                : Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+                ? theme.colorScheme.primary.withOpacity(0.5)
+                : theme.colorScheme.outline.withOpacity(0.2),
             width: isHighlighted ? 2 : 1,
           ),
         ),
@@ -473,11 +484,11 @@ class _SearchScreenState extends State<SearchScreen>
                     gradient: LinearGradient(
                       colors: [
                         surah.isMeccan
-                            ? const Color(0xFF667eea)
-                            : const Color(0xFF764ba2),
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.secondary,
                         surah.isMeccan
-                            ? const Color(0xFF764ba2)
-                            : const Color(0xFF667eea),
+                            ? theme.colorScheme.secondary
+                            : theme.colorScheme.primary,
                       ],
                     ),
                     borderRadius: BorderRadius.circular(16),
@@ -485,10 +496,8 @@ class _SearchScreenState extends State<SearchScreen>
                   child: Center(
                     child: Text(
                       surah.number.toString(),
-                      style: const TextStyle(
-                        color: Colors.white,
+                      style: theme.primaryTextTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.bold,
-                        fontSize: 18,
                       ),
                     ),
                   ),
@@ -511,7 +520,7 @@ class _SearchScreenState extends State<SearchScreen>
                                   ?.copyWith(
                                     fontWeight: FontWeight.bold,
                                     color: isHighlighted
-                                        ? Theme.of(context).colorScheme.primary
+                                        ? theme.colorScheme.primary
                                         : null,
                                   ),
                             ),
@@ -521,18 +530,17 @@ class _SearchScreenState extends State<SearchScreen>
                                 horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
                               color: surah.isMeccan
-                                  ? Colors.orange.withValues(alpha: 0.2)
-                                  : Colors.green.withValues(alpha: 0.2),
+                                  ? theme.colorScheme.tertiaryContainer
+                                  : theme.colorScheme.secondaryContainer,
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Text(
                               surah.revelationType,
-                              style: TextStyle(
-                                fontSize: 12,
+                              style: theme.textTheme.labelSmall?.copyWith(
                                 fontWeight: FontWeight.bold,
                                 color: surah.isMeccan
-                                    ? Colors.orange[700]
-                                    : Colors.green[700],
+                                    ? theme.colorScheme.onTertiaryContainer
+                                    : theme.colorScheme.onSecondaryContainer,
                               ),
                             ),
                           ),
@@ -543,7 +551,7 @@ class _SearchScreenState extends State<SearchScreen>
                         surah.name,
                         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                               fontFamily: 'Quran',
-                              color: Theme.of(context).colorScheme.primary,
+                              color: theme.colorScheme.primary,
                             ),
                         textAlign: TextAlign.right,
                         textDirection: TextDirection.rtl,

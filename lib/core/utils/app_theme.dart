@@ -16,6 +16,14 @@ enum AppThemeStyle {
   final Color primaryColor;
 }
 
+enum AppThemeGradient {
+  islamic,
+  sunset,
+  ocean,
+  forest,
+  royal,
+}
+
 enum ArabicFontFamily {
   amiri('Amiri', 'Amiri'),
   scheherazade('Scheherazade New', 'Scheherazade New'),
@@ -374,6 +382,27 @@ class AppTheme {
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
+
+  static const Gradient royalGradient = LinearGradient(
+    colors: [Color(0xFF9C27B0), Color(0xFF7B1FA2)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  static Gradient getGradient(AppThemeGradient gradient) {
+    switch (gradient) {
+      case AppThemeGradient.islamic:
+        return islamicGradient;
+      case AppThemeGradient.sunset:
+        return sunsetGradient;
+      case AppThemeGradient.ocean:
+        return oceanGradient;
+      case AppThemeGradient.forest:
+        return forestGradient;
+      case AppThemeGradient.royal:
+        return royalGradient;
+    }
+  }
 
   // Animation durations
   static const Duration shortAnimation = Duration(milliseconds: 200);

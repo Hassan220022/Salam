@@ -76,351 +76,292 @@ class _NotificationSettingsScreenState
 
   @override
   Widget build(BuildContext context) {
-    final isDarkTheme =
-        Provider.of<PreferenceSettingsProvider>(context).isDarkTheme;
-
     return Scaffold(
-      backgroundColor: isDarkTheme ? const Color(0xFF091945) : Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: Text(
+        title: const Text(
           'Notification Settings',
-          style: TextStyle(
-            color: isDarkTheme ? Colors.white : const Color(0xFF091945),
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        leading: IconButton(
-          icon: Icon(
-            Icons.arrow_back,
-            color: isDarkTheme ? Colors.white : const Color(0xFF091945),
-          ),
-          onPressed: () => Navigator.pop(context),
         ),
         actions: [
           IconButton(
-            icon: Icon(
-              Icons.save,
-              color: isDarkTheme ? Colors.white : const Color(0xFF091945),
-            ),
+            icon: const Icon(Icons.save),
             onPressed: _updateSettings,
           ),
         ],
       ),
       body: _isLoading
           ? const Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF667eea)),
-              ),
+              child: CircularProgressIndicator(),
             )
-          : _buildBody(isDarkTheme),
+          : _buildBody(),
     );
   }
 
-  Widget _buildBody(bool isDarkTheme) {
+  Widget _buildBody() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Prayer notifications section
-          _buildSectionHeader('Prayer Notifications', isDarkTheme),
+          _buildSectionHeader('Prayer Notifications'),
           const SizedBox(height: 16),
-          _buildPrayerNotificationSettings(isDarkTheme),
+          _buildPrayerNotificationSettings(),
           const SizedBox(height: 32),
 
           // Daily Ayah section
-          _buildSectionHeader('Daily Ayah', isDarkTheme),
+          _buildSectionHeader('Daily Ayah'),
           const SizedBox(height: 16),
-          _buildDailyAyahSettings(isDarkTheme),
+          _buildDailyAyahSettings(),
           const SizedBox(height: 32),
 
           // Notification info
-          _buildNotificationInfo(isDarkTheme),
+          _buildNotificationInfo(),
         ],
       ),
     );
   }
 
-  Widget _buildSectionHeader(String title, bool isDarkTheme) {
+  Widget _buildSectionHeader(String title) {
     return Text(
       title,
-      style: TextStyle(
-        fontSize: 20,
-        fontWeight: FontWeight.bold,
-        color: isDarkTheme ? Colors.white : const Color(0xFF091945),
-      ),
+      style: Theme.of(context).textTheme.headlineSmall,
     );
   }
 
-  Widget _buildPrayerNotificationSettings(bool isDarkTheme) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color:
-            isDarkTheme ? Colors.white.withOpacity(0.05) : Colors.grey.shade50,
+  Widget _buildPrayerNotificationSettings() {
+    final theme = Theme.of(context);
+    return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDarkTheme
-              ? Colors.white.withOpacity(0.1)
-              : Colors.grey.shade200,
-        ),
       ),
-      child: Column(
-        children: [
-          // Enable/disable prayer notifications
-          Row(
-            children: [
-              Icon(
-                Icons.mosque,
-                color: isDarkTheme ? Colors.white : const Color(0xFF091945),
-                size: 20,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            // Enable/disable prayer notifications
+            Row(
+              children: [
+                Icon(
+                  Icons.mosque,
+                  color: theme.colorScheme.secondary,
+                  size: 20,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Prayer Time Reminders',
+                        style: theme.textTheme.titleMedium,
+                      ),
+                      Text(
+                        'Get notified before each prayer time',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                Switch(
+                  value: _prayerNotificationsEnabled,
+                  onChanged: (value) {
+                    setState(() {
+                      _prayerNotificationsEnabled = value;
+                    });
+                  },
+                ),
+              ],
+            ),
+
+            if (_prayerNotificationsEnabled) ...[
+              const SizedBox(height: 16),
+              const Divider(),
+              const SizedBox(height: 16),
+
+              // Reminder time selector
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
                   children: [
-                    Text(
-                      'Prayer Time Reminders',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: isDarkTheme
-                            ? Colors.white
-                            : const Color(0xFF091945),
-                      ),
+                    Icon(
+                      Icons.access_time,
+                      color: theme.colorScheme.onSurfaceVariant,
+                      size: 18,
                     ),
+                    const SizedBox(width: 8),
                     Text(
-                      'Get notified before each prayer time',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color:
-                            isDarkTheme ? Colors.white70 : Colors.grey.shade600,
-                      ),
+                      'Reminder Time:',
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                    const SizedBox(width: 16),
+                    DropdownButton<int>(
+                      value: _reminderMinutes,
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() {
+                            _reminderMinutes = value;
+                          });
+                        }
+                      },
+                      items: [5, 10, 15, 20, 30]
+                          .map((minutes) => DropdownMenuItem(
+                                value: minutes,
+                                child: Text('$minutes minutes before', overflow: TextOverflow.ellipsis),
+                              ))
+                          .toList(),
                     ),
                   ],
                 ),
               ),
-              Switch(
-                value: _prayerNotificationsEnabled,
-                onChanged: (value) {
-                  setState(() {
-                    _prayerNotificationsEnabled = value;
-                  });
-                },
-                activeColor: const Color(0xFF667eea),
-              ),
             ],
-          ),
-
-          if (_prayerNotificationsEnabled) ...[
-            const SizedBox(height: 16),
-            const Divider(),
-            const SizedBox(height: 16),
-
-            // Reminder time selector
-            Row(
-              children: [
-                Icon(
-                  Icons.access_time,
-                  color: isDarkTheme ? Colors.white70 : Colors.grey.shade600,
-                  size: 18,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'Reminder Time:',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: isDarkTheme ? Colors.white70 : Colors.grey.shade600,
-                  ),
-                ),
-                const Spacer(),
-                DropdownButton<int>(
-                  value: _reminderMinutes,
-                  onChanged: (value) {
-                    if (value != null) {
-                      setState(() {
-                        _reminderMinutes = value;
-                      });
-                    }
-                  },
-                  dropdownColor:
-                      isDarkTheme ? const Color(0xFF091945) : Colors.white,
-                  style: TextStyle(
-                    color: isDarkTheme ? Colors.white : const Color(0xFF091945),
-                  ),
-                  items: [5, 10, 15, 20, 30]
-                      .map((minutes) => DropdownMenuItem(
-                            value: minutes,
-                            child: Text('$minutes minutes before'),
-                          ))
-                      .toList(),
-                ),
-              ],
-            ),
           ],
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildDailyAyahSettings(bool isDarkTheme) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color:
-            isDarkTheme ? Colors.white.withOpacity(0.05) : Colors.grey.shade50,
+  Widget _buildDailyAyahSettings() {
+    final theme = Theme.of(context);
+    return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDarkTheme
-              ? Colors.white.withOpacity(0.1)
-              : Colors.grey.shade200,
-        ),
       ),
-      child: Column(
-        children: [
-          // Enable/disable daily ayah
-          Row(
-            children: [
-              Icon(
-                Icons.auto_awesome,
-                color: isDarkTheme ? Colors.white : const Color(0xFF091945),
-                size: 20,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            // Enable/disable daily ayah
+            Row(
+              children: [
+                Icon(
+                  Icons.auto_awesome,
+                  color: theme.colorScheme.secondary,
+                  size: 20,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Daily Ayah Notification',
+                        style: theme.textTheme.titleMedium,
+                      ),
+                      Text(
+                        'Receive inspiration from the Quran daily',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                Switch(
+                  value: _dailyAyahEnabled,
+                  onChanged: (value) {
+                    setState(() {
+                      _dailyAyahEnabled = value;
+                    });
+                  },
+                ),
+              ],
+            ),
+
+            if (_dailyAyahEnabled) ...[
+              const SizedBox(height: 16),
+              const Divider(),
+              const SizedBox(height: 16),
+
+              // Daily ayah time selector
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
                   children: [
-                    Text(
-                      'Daily Ayah Notification',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: isDarkTheme
-                            ? Colors.white
-                            : const Color(0xFF091945),
-                      ),
+                    Icon(
+                      Icons.schedule,
+                      color: theme.colorScheme.onSurfaceVariant,
+                      size: 18,
                     ),
+                    const SizedBox(width: 8),
                     Text(
-                      'Receive inspiration from the Quran daily',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color:
-                            isDarkTheme ? Colors.white70 : Colors.grey.shade600,
-                      ),
+                      'Daily Time:',
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                    const SizedBox(width: 16),
+                    DropdownButton<int>(
+                      value: _dailyAyahHour,
+                      onChanged: (value) {
+                        if (value != null) {
+                          setState(() {
+                            _dailyAyahHour = value;
+                          });
+                        }
+                      },
+                      items: List.generate(24, (index) => index)
+                          .map((hour) => DropdownMenuItem(
+                                value: hour,
+                                child:
+                                    Text('${hour.toString().padLeft(2, '0')}:00'),
+                              ))
+                          .toList(),
                     ),
                   ],
                 ),
               ),
-              Switch(
-                value: _dailyAyahEnabled,
-                onChanged: (value) {
-                  setState(() {
-                    _dailyAyahEnabled = value;
-                  });
-                },
-                activeColor: const Color(0xFF667eea),
-              ),
             ],
-          ),
-
-          if (_dailyAyahEnabled) ...[
-            const SizedBox(height: 16),
-            const Divider(),
-            const SizedBox(height: 16),
-
-            // Daily ayah time selector
-            Row(
-              children: [
-                Icon(
-                  Icons.schedule,
-                  color: isDarkTheme ? Colors.white70 : Colors.grey.shade600,
-                  size: 18,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'Daily Time:',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: isDarkTheme ? Colors.white70 : Colors.grey.shade600,
-                  ),
-                ),
-                const Spacer(),
-                DropdownButton<int>(
-                  value: _dailyAyahHour,
-                  onChanged: (value) {
-                    if (value != null) {
-                      setState(() {
-                        _dailyAyahHour = value;
-                      });
-                    }
-                  },
-                  dropdownColor:
-                      isDarkTheme ? const Color(0xFF091945) : Colors.white,
-                  style: TextStyle(
-                    color: isDarkTheme ? Colors.white : const Color(0xFF091945),
-                  ),
-                  items: List.generate(24, (index) => index)
-                      .map((hour) => DropdownMenuItem(
-                            value: hour,
-                            child:
-                                Text('${hour.toString().padLeft(2, '0')}:00'),
-                          ))
-                      .toList(),
-                ),
-              ],
-            ),
           ],
-        ],
+        ),
       ),
     );
   }
 
-  Widget _buildNotificationInfo(bool isDarkTheme) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.blue.withOpacity(0.1),
+  Widget _buildNotificationInfo() {
+    final theme = Theme.of(context);
+    return Card(
+      elevation: 0,
+      color: theme.colorScheme.secondaryContainer.withOpacity(0.3),
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.blue.withOpacity(0.3)),
+        side: BorderSide(color: theme.colorScheme.secondaryContainer),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.info_outline,
-                color: Colors.blue.shade700,
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                'Notification Information',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blue.shade700,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.info_outline,
+                  color: theme.colorScheme.onSecondaryContainer,
+                  size: 20,
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(
-            '• Prayer notifications require location permission\n'
-            '• Notifications work even when the app is closed\n'
-            '• You can customize notification sounds in your device settings\n'
-            '• Daily Ayah includes beautiful verses with translations',
-            style: TextStyle(
-              fontSize: 14,
-              height: 1.5,
-              color: Colors.blue.shade800,
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Notification Information',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      color: theme.colorScheme.onSecondaryContainer,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
+            const SizedBox(height: 12),
+            Text(
+              '• Prayer notifications require location permission\n'
+              '• Notifications work even when the app is closed\n'
+              '• You can customize notification sounds in your device settings\n'
+              '• Daily Ayah includes beautiful verses with translations',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                height: 1.5,
+                color: theme.colorScheme.onSecondaryContainer.withOpacity(0.8),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

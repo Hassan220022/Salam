@@ -67,7 +67,7 @@ class _QuranReaderScreenState extends State<QuranReaderScreen> {
     return Scaffold(
       body: Consumer2<SurahProvider, PreferenceSettingsProvider>(
         builder: (context, surahProvider, preferenceProvider, child) {
-          final isDarkTheme = preferenceProvider.isDarkTheme;
+          final theme = Theme.of(context);
 
           if (_isLoading) {
             return const Center(child: CircularProgressIndicator());
@@ -80,10 +80,7 @@ class _QuranReaderScreenState extends State<QuranReaderScreen> {
                 children: [
                   Text(
                     'Failed to load Quran. Please try again later.',
-                    style: TextStyle(
-                      color: isDarkTheme ? Colors.white : Colors.black,
-                      fontSize: 16.0,
-                    ),
+                    style: theme.textTheme.titleLarge,
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 16),
@@ -105,6 +102,7 @@ class _QuranReaderScreenState extends State<QuranReaderScreen> {
                   'assets/basmallah.png',
                   height: 50.0,
                   fit: BoxFit.contain,
+                  color: theme.colorScheme.onSurface,
                 ),
               ),
               const Divider(),
@@ -112,57 +110,34 @@ class _QuranReaderScreenState extends State<QuranReaderScreen> {
               Expanded(
                 child: RefreshIndicator(
                   onRefresh: _loadAllVerses,
-                  color: const Color(0xFF667eea),
                   child: ListView.builder(
                     itemCount: _allVerses.length,
                     itemBuilder: (context, index) {
                       final verse = _allVerses[index];
 
-                      return Container(
+                      return Card(
                         margin: const EdgeInsets.symmetric(
                           horizontal: 16,
                           vertical: 4,
                         ),
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: isDarkTheme
-                                ? [
-                                    const Color(0xFF2a2a3e),
-                                    const Color(0xFF1e1e2e)
-                                  ]
-                                : [Colors.white, const Color(0xFFf8f9fa)],
-                          ),
+                        elevation: 1,
+                        shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: isDarkTheme
-                                  ? Colors.black.withOpacity(0.3)
-                                  : Colors.grey.withOpacity(0.1),
-                              spreadRadius: 1,
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
                         ),
                         child: ListTile(
                           leading: CircleAvatar(
-                            backgroundColor: isDarkTheme
-                                ? Colors.white
-                                : const Color(0xFF091945),
+                            backgroundColor: theme.colorScheme.primary,
                             child: Text(
                               verse.number.toString(),
                               style: TextStyle(
-                                color:
-                                    isDarkTheme ? Colors.black : Colors.white,
+                                color: theme.colorScheme.onPrimary,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                           ),
                           title: Text(
                             verse.arabicText,
-                            style: TextStyle(
-                              color: isDarkTheme ? Colors.white : Colors.black,
-                              fontSize: 16.0,
+                            style: theme.textTheme.titleMedium?.copyWith(
                               fontFamily: 'Roboto',
                             ),
                             textAlign: TextAlign.right,
@@ -170,11 +145,9 @@ class _QuranReaderScreenState extends State<QuranReaderScreen> {
                           subtitle: verse.hasTranslation
                               ? Text(
                                   verse.translation!,
-                                  style: TextStyle(
-                                    color: isDarkTheme
-                                        ? Colors.white70
-                                        : Colors.grey[600],
-                                    fontSize: 14.0,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: theme.colorScheme.onSurface
+                                        .withOpacity(0.7),
                                   ),
                                 )
                               : null,

@@ -4,11 +4,10 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
-import 'package:provider/provider.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'dart:math' as math;
-import '../providers/preference_settings_provider.dart';
 import '../widgets/enhanced_loading.dart';
+import '../../core/utils/app_theme.dart';
 
 class PrayerTimeService {
   Future<Map<String, dynamic>> getPrayerTimes(String latitude, String longitude,
@@ -78,7 +77,7 @@ class PrayerTimesWidget extends StatefulWidget {
   const PrayerTimesWidget({super.key});
 
   @override
-  _PrayerTimesWidgetState createState() => _PrayerTimesWidgetState();
+  State<PrayerTimesWidget> createState() => _PrayerTimesWidgetState();
 }
 
 class _PrayerTimesWidgetState extends State<PrayerTimesWidget>
@@ -193,8 +192,8 @@ class _PrayerTimesWidgetState extends State<PrayerTimesWidget>
         _prayerTimeService.getIslamicCalendar(),
       ]);
 
-      final timings = results[0] as Map<String, dynamic>;
-      final islamicCalendar = results[1] as Map<String, dynamic>;
+      final timings = results[0];
+      final islamicCalendar = results[1];
 
       // Format the prayer times
       DateFormat inputFormat = DateFormat("HH:mm");
@@ -482,18 +481,11 @@ class _PrayerTimesWidgetState extends State<PrayerTimesWidget>
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            const Color(0xFF11998e),
-            const Color(0xFF38ef7d),
-          ],
-        ),
+        gradient: AppTheme.forestGradient,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF11998e).withValues(alpha: 0.3),
+            color: colorScheme.primary.withValues(alpha: 0.3),
             blurRadius: 16,
             offset: const Offset(0, 8),
           ),
@@ -594,18 +586,11 @@ class _PrayerTimesWidgetState extends State<PrayerTimesWidget>
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            const Color(0xFFf093fb),
-            const Color(0xFFf5576c),
-          ],
-        ),
+        gradient: AppTheme.sunsetGradient,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFf093fb).withValues(alpha: 0.3),
+            color: colorScheme.secondary.withValues(alpha: 0.3),
             blurRadius: 16,
             offset: const Offset(0, 8),
           ),
@@ -793,18 +778,11 @@ class _PrayerTimesWidgetState extends State<PrayerTimesWidget>
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF667eea),
-            Color(0xFF764ba2),
-          ],
-        ),
+        gradient: AppTheme.islamicGradient,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF667eea).withValues(alpha: 0.3),
+            color: colorScheme.primary.withValues(alpha: 0.3),
             blurRadius: 20,
             offset: const Offset(0, 8),
           ),
@@ -841,11 +819,11 @@ class _PrayerTimesWidgetState extends State<PrayerTimesWidget>
                     ),
                     Text(
                       _nextPrayer ?? "Loading...",
-                      style:
-                          Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
+                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
@@ -856,41 +834,47 @@ class _PrayerTimesWidgetState extends State<PrayerTimesWidget>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Time',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.8),
-                        ),
-                  ),
-                  Text(
-                    _nextPrayerTime ?? "Loading...",
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Time',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.8),
+                          ),
+                    ),
+                    Text(
+                      _nextPrayerTime ?? "Loading...",
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
               ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    'Remaining',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.8),
-                        ),
-                  ),
-                  Text(
-                    timeLeftString,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      'Remaining',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.8),
+                          ),
+                    ),
+                    Text(
+                      timeLeftString,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -932,7 +916,7 @@ class _PrayerTimesWidgetState extends State<PrayerTimesWidget>
                 ]
               : [
                   colorScheme.surface,
-                  colorScheme.surfaceContainer.withValues(alpha: 0.5),
+                  colorScheme.surfaceContainerHighest,
                 ],
         ),
         borderRadius: BorderRadius.circular(20),
@@ -988,6 +972,7 @@ class _PrayerTimesWidgetState extends State<PrayerTimesWidget>
                     ? colorScheme.onPrimaryContainer
                     : colorScheme.onSurface,
               ),
+          overflow: TextOverflow.ellipsis,
         ),
         trailing: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -1004,6 +989,7 @@ class _PrayerTimesWidgetState extends State<PrayerTimesWidget>
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
                 ),
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ),
@@ -1034,7 +1020,7 @@ class _PrayerTimesWidgetState extends State<PrayerTimesWidget>
 
     return Icon(
       iconData,
-      color: Colors.white,
+      color: Theme.of(context).colorScheme.onPrimary,
       size: 24,
     );
   }
