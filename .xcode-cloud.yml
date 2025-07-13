@@ -1,0 +1,15 @@
+version: 1
+
+# Xcode Cloud configuration for Flutter iOS project
+ci_post_clone: ci_scripts/ci_post_clone.sh
+ci_pre_xcodebuild: ci_scripts/ci_pre_xcodebuild.sh
+
+# Environment configuration
+environment:
+  flutter_version: "3.32.4"  # Specify Flutter version to ensure consistency
+  xcode_version: "16.4"       # Match your local Xcode version
+  
+# Build configuration  
+archive:
+  scheme: Runner
+  destination: generic/platform=iOS 
