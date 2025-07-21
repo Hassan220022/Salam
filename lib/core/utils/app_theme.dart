@@ -29,7 +29,8 @@ enum ArabicFontFamily {
   scheherazade('Scheherazade New', 'Scheherazade New'),
   notoSansArabic('Noto Sans Arabic', 'Noto Sans Arabic'),
   cairo('Cairo', 'Cairo'),
-  tajawal('Tajawal', 'Tajawal');
+  tajawal('Tajawal', 'Tajawal'),
+  kitab('Kitab', 'Kitab');
 
   const ArabicFontFamily(this.displayName, this.fontFamily);
   final String displayName;
@@ -67,7 +68,7 @@ class AppTheme {
   // Typography
   static TextTheme _getTextTheme({
     required bool isArabic,
-    ArabicFontFamily arabicFont = ArabicFontFamily.cairo,
+    ArabicFontFamily arabicFont = ArabicFontFamily.kitab,
     double fontScale = 1.0,
   }) {
     if (isArabic) {
@@ -116,7 +117,7 @@ class AppTheme {
   // Light Theme
   static ThemeData lightTheme({
     AppThemeStyle style = AppThemeStyle.islamic,
-    ArabicFontFamily arabicFont = ArabicFontFamily.cairo,
+    ArabicFontFamily arabicFont = ArabicFontFamily.kitab,
     double fontScale = 1.0,
     bool isHighContrast = false,
   }) {
@@ -210,7 +211,7 @@ class AppTheme {
   // Dark Theme
   static ThemeData darkTheme({
     AppThemeStyle style = AppThemeStyle.islamic,
-    ArabicFontFamily arabicFont = ArabicFontFamily.cairo,
+    ArabicFontFamily arabicFont = ArabicFontFamily.kitab,
     double fontScale = 1.0,
     bool isHighContrast = false,
   }) {
@@ -303,7 +304,7 @@ class AppTheme {
 
   // Arabic text theme for Quran verses
   static TextTheme arabicTextTheme({
-    ArabicFontFamily arabicFont = ArabicFontFamily.cairo,
+    ArabicFontFamily arabicFont = ArabicFontFamily.kitab,
     double fontScale = 1.0,
   }) {
     return GoogleFonts.getTextTheme(

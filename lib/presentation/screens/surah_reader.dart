@@ -13,6 +13,8 @@ import '../../data/models/translation.dart';
 import '../../data/models/tafsir.dart';
 import '../../services/audio_player_service.dart';
 import '../../services/quran_service.dart';
+import 'package:flutter/gestures.dart';
+import 'package:visibility_detector/visibility_detector.dart';
 
 class SurahReaderScreen extends StatefulWidget {
   final int surahNumber;
@@ -58,8 +60,8 @@ class _SurahReaderScreenState extends State<SurahReaderScreen> {
       _loadTafsir();
     });
 
-    // Set up scroll listener for progress tracking
-    _scrollController.addListener(_onScroll);
+    // Remove scroll listener for progress tracking
+    // _scrollController.addListener(_onScroll);
   }
 
   Future<void> _loadSurah() async {
@@ -135,6 +137,7 @@ class _SurahReaderScreenState extends State<SurahReaderScreen> {
   void _playAudio(int ayahNumber) async {
     String surahStr = widget.surahNumber.toString().padLeft(3, '0');
     String ayahStr = ayahNumber.toString().padLeft(3, '0');
+    // Revert to original 64kbps stream for compatibility
     String audioUrl =
         'https://everyayah.com/data/AbdulSamad_64kbps_QuranExplorer.Com/$surahStr$ayahStr.mp3';
 
@@ -392,61 +395,7 @@ class _SurahReaderScreenState extends State<SurahReaderScreen> {
     }
   }
 
-  void _onScroll() {
-    if (!mounted || _ayahs.isEmpty) return;
-
-    final progressProvider =
-        Provider.of<ReadingProgressProvider>(context, listen: false);
-
-    // Get the current scroll position
-    final scrollOffset = _scrollController.offset;
-    final viewportHeight = _scrollController.position.viewportDimension;
-    final totalScrollableHeight = _scrollController.position.maxScrollExtent;
-
-    // Calculate which verse is currently in the middle of the viewport
-    // This gives us a more accurate representation of reading progress
-    final middleOfViewport = scrollOffset + (viewportHeight / 2);
-
-    // Calculate progress as percentage of scroll completion
-    double scrollProgress = 0.0;
-    if (totalScrollableHeight > 0) {
-      scrollProgress = (scrollOffset / totalScrollableHeight).clamp(0.0, 1.0);
-    }
-
-    // If user has scrolled to the very bottom, mark as completed
-    if (scrollOffset >= totalScrollableHeight - 10) {
-      // 10px threshold for bottom detection
-      // Mark as fully completed - this will trigger auto-removal in the provider
-      if (_lastReportedAyah != _totalAyahs) {
-        _lastReportedAyah = _totalAyahs;
-        progressProvider.updateProgress(
-          widget.surahNumber,
-          widget.surahName,
-          _totalAyahs, // Set to total ayahs to indicate completion
-          _totalAyahs,
-        );
-      }
-      return;
-    }
-
-    // Convert scroll progress to ayah number
-    // Add 1 because we want to show that we're reading verse X, not that we've completed X-1 verses
-    final currentAyah =
-        ((scrollProgress * _totalAyahs) + 1).round().clamp(1, _totalAyahs);
-
-    // Only update if the ayah has changed and is valid
-    if (currentAyah > 0 &&
-        currentAyah <= _totalAyahs &&
-        currentAyah != _lastReportedAyah) {
-      _lastReportedAyah = currentAyah;
-      progressProvider.updateProgress(
-        widget.surahNumber,
-        widget.surahName,
-        currentAyah,
-        _totalAyahs,
-      );
-    }
-  }
+  // Remove _onScroll and any related logic
 
   Future<void> _loadTranslations() async {
     final prefProvider =
@@ -1020,323 +969,234 @@ class _SurahReaderScreenState extends State<SurahReaderScreen> {
     );
   }
 
-  Widget _buildAyahWidget(
-      Verse verse, int index, PreferenceSettingsProvider prefProvider) {
+  Widget _buildQuranPage(BuildContext context, PreferenceSettingsProvider prefProvider) {
     final theme = Theme.of(context);
-    final isHighlighted =
-        widget.highlightAyah != null && verse.number == widget.highlightAyah;
-    final isPlaying = _currentlyPlayingAyah == verse.number;
-
-    // Get translation for this ayah
-    Translation? translation;
-    if (_translations != null) {
-      try {
-        translation = _translations!.translations.firstWhere(
-          (t) => t.number == verse.number,
-        );
-      } catch (e) {
-        // Translation not found
-      }
+    final themeProvider = Provider.of<EnhancedThemeProvider>(context);
+    final isDark = themeProvider.isDarkTheme(context);
+    // Helper to convert int to Arabic-Indic numerals
+    String toArabicNumber(int number) {
+      const arabicDigits = ['٠','١','٢','٣','٤','٥','٦','٧','٨','٩'];
+      return number.toString().split('').map((d) => arabicDigits[int.parse(d)]).join();
     }
-
-    // Get tafsir for this ayah
-    Tafsir? tafsir;
-    if (_tafsir != null) {
-      try {
-        tafsir = _tafsir!.tafasir.firstWhere(
-          (t) => t.ayahNumber == verse.number,
-        );
-      } catch (e) {
-        // Tafsir not found
-      }
-    }
-
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-      elevation: isHighlighted ? 8.0 : 2.0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20.0),
-        side: isHighlighted
-            ? BorderSide(color: theme.colorScheme.primary, width: 2)
-            : BorderSide.none,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Elegant Header with Ayah Number
-          Padding(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
-            child: Row(
-              children: [
-                // Beautiful Ayah Number
-                Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    color: isPlaying
-                        ? theme.colorScheme.primaryContainer
-                        : theme.colorScheme.secondaryContainer,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: (isPlaying
-                                ? theme.colorScheme.primary
-                                : theme.colorScheme.secondary)
-                            .withOpacity(0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Center(
-                    child: Text(
-                      verse.number.toString(),
-                      style: TextStyle(
-                        color: isPlaying
-                            ? theme.colorScheme.onPrimaryContainer
-                            : theme.colorScheme.onSecondaryContainer,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16.0,
-                      ),
-                    ),
-                  ),
-                ),
-                const Spacer(),
-
-                // Action Buttons with Beautiful Styling
-                Row(
-                  children: [
-                    // Audio Control
-                    IconButton(
-                      icon: Icon(
-                        isPlaying
-                            ? Icons.pause_circle_filled
-                            : Icons.play_circle_filled,
-                        color: isPlaying
-                            ? theme.colorScheme.primary
-                            : theme.colorScheme.secondary,
-                        size: 28,
-                      ),
-                      onPressed: () {
-                        if (isPlaying) {
-                          _stopAudio();
-                        } else {
-                          _playAudio(verse.number);
-                        }
-                      },
-                    ),
-                    const SizedBox(width: 8),
-
-                    // Bookmark Button
-                    IconButton(
-                      icon: Icon(
-                        Icons.bookmark_add_rounded,
-                        color: theme.colorScheme.secondary,
-                        size: 24,
-                      ),
-                      onPressed: () => _showBookmarkDialog(verse),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+    // Themed color for ayah marker and surah name
+    final ayahMarkerColor = isDark ? Colors.white : Colors.black;
+    final surahNameColor = isDark ? Colors.white : Colors.black;
+    final surahNameFontSize = themeProvider.arabicFontSize + 2; // Reduced for better fit
+    // Build a single list of InlineSpans for the whole surah
+    final List<InlineSpan> ayahSpans = [];
+    for (final verse in _ayahs) {
+      final isHighlighted = widget.highlightAyah != null && verse.number == widget.highlightAyah;
+      ayahSpans.add(
+        TextSpan(
+          text: verse.arabicText.trim() + ' ',
+          style: TextStyle(
+            fontFamily: 'Kitab',
+            fontSize: themeProvider.arabicFontSize + 2,
+            color: isDark ? const Color(0xFFE8F4FD) : themeProvider.getReadingModeTextColor(context),
+            backgroundColor: isHighlighted ? ayahMarkerColor.withOpacity(0.15) : null,
+            height: 1.3,
           ),
-
-          // Decorative Divider
-          Divider(
-            height: 1,
-            indent: 20,
-            endIndent: 20,
-            color: theme.dividerColor,
-          ),
-
-          // Arabic Text with Beautiful Typography
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              children: [
-                Consumer<EnhancedThemeProvider>(
-                  builder: (context, themeProvider, child) {
-                    return Text(
-                      verse.arabicText,
-                      style: theme.textTheme.headlineSmall?.copyWith(
-                        fontFamily: 'Roboto', // This should be a specific quran font if available
-                        fontSize: themeProvider.arabicFontSize,
-                        height: 2.0,
-                        color: themeProvider.getReadingModeTextColor(context),
-                      ),
-                      textDirection: TextDirection.rtl,
-                      textAlign: TextAlign.center,
-                    );
-                  },
+          recognizer: TapGestureRecognizer()
+            ..onTap = () {
+              showModalBottomSheet(
+                context: context,
+                backgroundColor: Colors.transparent,
+                builder: (context) => _buildAyahActionMenu(context, verse, _currentlyPlayingAyah == verse.number),
+              );
+            },
+        ),
+      );
+      ayahSpans.add(
+        WidgetSpan(
+          alignment: PlaceholderAlignment.middle,
+          child: GestureDetector(
+            onTap: () {
+              showModalBottomSheet(
+                context: context,
+                backgroundColor: Colors.transparent,
+                builder: (context) => _buildAyahActionMenu(context, verse, _currentlyPlayingAyah == verse.number),
+              );
+            },
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 0),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+              decoration: BoxDecoration(
+                color: isDark ? theme.colorScheme.surface : theme.colorScheme.surface,
+                border: Border.all(
+                  color: ayahMarkerColor,
+                  width: 1.2,
                 ),
-
-                // Decorative ornament
-                if (!prefProvider.showTranslation && !prefProvider.showTafsir)
-                  Container(
-                    margin: const EdgeInsets.only(top: 16),
-                    width: 80,
-                    height: 2,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Colors.transparent,
-                          theme.dividerColor,
-                          Colors.transparent
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(1),
-                    ),
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: ayahMarkerColor.withOpacity(0.08),
+                    blurRadius: 2,
+                    offset: const Offset(0, 1),
                   ),
-              ],
-            ),
-          ),
-
-          // Translation with Beautiful Styling
-          if (prefProvider.showTranslation && translation != null)
-            Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
-              child: Card(
-                elevation: 0,
-                color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16.0),
-                  side: BorderSide(
-                    color: theme.colorScheme.outline.withOpacity(0.3),
-                    width: 1,
-                  ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.secondaryContainer
-                                  .withOpacity(0.5),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.translate,
-                                  size: 14,
-                                  color: theme.colorScheme.onSecondaryContainer,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'Translation',
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                    color:
-                                        theme.colorScheme.onSecondaryContainer,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        translation.text,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          height: 1.6,
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
-                    ],
-                  ),
+                ],
+              ),
+              child: Text(
+                '\u06DD${toArabicNumber(verse.number)}',
+                style: TextStyle(
+                  fontFamily: 'Kitab',
+                  fontSize: themeProvider.arabicFontSize - 2,
+                  color: ayahMarkerColor,
                 ),
               ),
             ),
-
-          // Tafsir with Beautiful Styling
-          if (prefProvider.showTafsir)
-            Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
-              child: Card(
-                elevation: 0,
-                color: theme.colorScheme.surfaceVariant.withOpacity(0.5),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16.0),
-                  side: BorderSide(
-                    color: theme.colorScheme.outline.withOpacity(0.3),
-                    width: 1,
+          ),
+        ),
+      );
+      ayahSpans.add(const TextSpan(text: ' '));
+    }
+    return Container(
+      color: isDark ? const Color(0xFF181818) : const Color(0xFFFFF8E1),
+      child: SingleChildScrollView(
+        controller: _scrollController,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Surah header with decorative image
+            Center(
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Image.asset(
+                    'assets/head.png',
+                    height: 60,
+                    fit: BoxFit.fitWidth,
+                    width: double.infinity,
+                    color: isDark ? Colors.white : null,
+                    colorBlendMode: isDark ? BlendMode.srcIn : BlendMode.dst,
                   ),
+                  Text(
+                    widget.surahName,
+                    style: theme.textTheme.headlineMedium?.copyWith(
+                      fontFamily: 'Kitab',
+                      fontWeight: FontWeight.bold,
+                      fontSize: surahNameFontSize,
+                      color: surahNameColor,
+                    ),
+                    textDirection: TextDirection.rtl,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            if (_ayahs.isNotEmpty && widget.surahNumber != 1 && widget.surahNumber != 9)
+              Center(
+                child: Image.asset(
+                  basmallahImagePath,
+                  height: 50.0,
+                  fit: BoxFit.contain,
+                  color: themeProvider.getReadingModeTextColor(context),
+                  colorBlendMode: BlendMode.modulate,
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: theme.colorScheme.tertiaryContainer
-                                  .withOpacity(0.5),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.menu_book_rounded,
-                                  size: 14,
-                                  color: theme.colorScheme.onTertiaryContainer,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  'Commentary',
-                                  style: theme.textTheme.labelSmall?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                    color:
-                                        theme.colorScheme.onTertiaryContainer,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      // Show tafsir text if available, otherwise show helpful message
-                      if (tafsir != null && tafsir.text.isNotEmpty)
-                        Text(
-                          tafsir.text,
+              ),
+            const SizedBox(height: 24),
+            // Quranic text block
+            Directionality(
+              textDirection: TextDirection.rtl,
+              child: RichText(
+                text: TextSpan(children: ayahSpans),
+                textAlign: TextAlign.justify,
+              ),
+            ),
+            // Translation and Tafsir (optional, below the Quranic text)
+            if (prefProvider.showTranslation && _translations != null)
+              ..._ayahs.map((verse) {
+                final translation = _translations!.translations.firstWhere(
+                  (t) => t.number == verse.number,
+                  orElse: () => Translation(number: verse.number, text: '', edition: '', language: ''),
+                );
+                return translation.text.isNotEmpty
+                    ? Padding(
+                        padding: const EdgeInsets.only(top: 12, right: 8, left: 8),
+                        child: Text(
+                          '${verse.number}. ${translation.text}',
                           style: theme.textTheme.bodyMedium?.copyWith(
-                            height: 1.6,
-                            fontWeight: FontWeight.w400,
-                          ),
-                        )
-                      else
-                        Text(
-                          'Tafsir not available for this verse.',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            height: 1.6,
+                            color: theme.colorScheme.onSurfaceVariant,
                             fontStyle: FontStyle.italic,
+                          ),
+                          textAlign: TextAlign.left,
+                        ),
+                      )
+                    : const SizedBox.shrink();
+              }),
+            if (prefProvider.showTafsir && _tafsir != null)
+              ..._ayahs.map((verse) {
+                final tafsir = _tafsir!.tafasir.firstWhere(
+                  (t) => t.ayahNumber == verse.number,
+                  orElse: () => Tafsir(ayahNumber: verse.number, text: '', author: '', language: ''),
+                );
+                return tafsir.text.isNotEmpty
+                    ? Padding(
+                        padding: const EdgeInsets.only(top: 8, right: 8, left: 8),
+                        child: Text(
+                          '${verse.number}. ${tafsir.text}',
+                          style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
+                          textAlign: TextAlign.left,
                         ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          const SizedBox(height: 12),
+                      )
+                    : const SizedBox.shrink();
+              }),
+            // TODO: Add audio quality/reciter selection setting for improved sound
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAyahActionMenu(BuildContext context, Verse verse, bool isPlaying) {
+    final theme = Theme.of(context);
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(25),
+          topRight: Radius.circular(25),
+        ),
+      ),
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: Icon(isPlaying ? Icons.pause_circle_filled : Icons.play_circle_filled),
+            title: Text(isPlaying ? 'Pause Audio' : 'Play Audio'),
+            onTap: () {
+              Navigator.pop(context);
+              if (isPlaying) {
+                _stopAudio();
+              } else {
+                _playAudio(verse.number);
+              }
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.bookmark_add_rounded),
+            title: const Text('Bookmark Ayah'),
+            onTap: () {
+              Navigator.pop(context);
+              _showBookmarkDialog(verse);
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.check_circle_outline),
+            title: const Text('Mark as Last Read'),
+            onTap: () {
+              Provider.of<ReadingProgressProvider>(context, listen: false).updateProgress(
+                widget.surahNumber,
+                widget.surahName,
+                verse.number,
+                _ayahs.length,
+              );
+              Navigator.pop(context);
+            },
+          ),
         ],
       ),
     );
@@ -1496,63 +1356,9 @@ class _SurahReaderScreenState extends State<SurahReaderScreen> {
                           );
                         },
                       ),
-
-                    // Content
+                    // Quran page layout
                     Expanded(
-                      child: ListView.builder(
-                        controller: _scrollController,
-                        itemCount: _ayahs.length + 1, // +1 for Basmallah
-                        itemBuilder: (context, index) {
-                          if (index == 0) {
-                            return Consumer<EnhancedThemeProvider>(
-                              builder: (context, themeProvider, child) {
-                                final isDarkTheme = themeProvider.isDarkTheme(context);
-                                return Padding(
-                                  padding: const EdgeInsets.all(16.0),
-                                  child: ColorFiltered(
-                                    colorFilter: isDarkTheme
-                                        ? const ColorFilter.mode(
-                                            Colors.transparent, BlendMode.multiply)
-                                        : const ColorFilter.matrix([
-                                            -1,
-                                            0,
-                                            0,
-                                            0,
-                                            255,
-                                            0,
-                                            -1,
-                                            0,
-                                            0,
-                                            255,
-                                            0,
-                                            0,
-                                            -1,
-                                            0,
-                                            255,
-                                            0,
-                                            0,
-                                            0,
-                                            1,
-                                            0,
-                                          ]),
-                                    child: Image.asset(
-                                      basmallahImagePath,
-                                      height: 50.0,
-                                      fit: BoxFit.contain,
-                                      color: themeProvider.getReadingModeTextColor(context),
-                                      colorBlendMode: BlendMode.modulate,
-                                    ),
-                                  ),
-                                );
-                              },
-                            );
-                          }
-
-                          final verse = _ayahs[index - 1];
-                          return _buildAyahWidget(
-                              verse, index - 1, prefProvider);
-                        },
-                      ),
+                      child: _buildQuranPage(context, prefProvider),
                     ),
                   ],
                 ),
